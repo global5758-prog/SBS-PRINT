@@ -1,0 +1,17 @@
+{
+  "name": "SB Print",
+  "short_name": "SB Print",
+  "description": "Cetak struk thermal untuk SB Sejahtera",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#14161a",
+  "theme_color": "#0F7A5C",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
