@@ -1,0 +1,24 @@
+# SB Print - pengaturan server (cPanel/Apache)
+DirectoryIndex index.html
+
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType application/json .json
+  AddType application/javascript .js
+  AddType image/png .png
+</IfModule>
+
+# Jangan cache sw.js, manifest, index supaya update langsung terbaca
+<FilesMatch "^(sw\.js|manifest\.json|index\.html)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Service-Worker-Allowed "/print/"
+  </IfModule>
+</FilesMatch>
+
+# Paksa HTTPS (wajib untuk instal aplikasi)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>

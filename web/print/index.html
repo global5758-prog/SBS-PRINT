@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SB Print — Cetak Thermal SB Sejahtera</title>
+<link rel="manifest" href="/print/manifest.json">
+<meta name="theme-color" content="#0F7A5C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SB Print">
+<link rel="apple-touch-icon" href="/print/icons/icon-192.png">
+<link rel="icon" type="image/png" href="/print/icons/icon-192.png">
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --ink:#1a1d23; --sub:#5b6270;
+    --accent:#0f7a5c; --accent-ink:#ffffff; --border:#e2e4e9;
+    --danger:#c0392b; --warn:#a86a00; --ok:#0f7a5c; --mono:#0e1116;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14161a; --card:#1d2025; --ink:#eef0f3; --sub:#a4abb8;
+      --accent:#1fa77c; --accent-ink:#06120d; --border:#2b2f36;
+      --danger:#ff6b5e; --warn:#e0a63b; --ok:#3fd6a6; --mono:#0a0c0f;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14161a; --card:#1d2025; --ink:#eef0f3; --sub:#a4abb8;
+    --accent:#1fa77c; --accent-ink:#06120d; --border:#2b2f36;
+    --danger:#ff6b5e; --warn:#e0a63b; --ok:#3fd6a6; --mono:#0a0c0f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); padding:20px 14px 60px;
+  }
+  .wrap{max-width:520px; margin:0 auto;}
+  h1{font-size:20px; margin:0 0 2px;}
+  .sub{color:var(--sub); font-size:13px; margin-bottom:18px;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:16px; margin-bottom:14px;
+  }
+  .card h2{font-size:14px; margin:0 0 10px; display:flex; align-items:center; gap:8px;}
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  button{
+    border:none; border-radius:10px; padding:11px 14px; font-size:14px; font-weight:600;
+    cursor:pointer; background:var(--accent); color:var(--accent-ink); flex:1;
+    min-width:120px; transition:opacity .15s;
+  }
+  button.secondary{background:transparent; color:var(--ink); border:1px solid var(--border);}
+  button:disabled{opacity:.45; cursor:not-allowed;}
+  button:active:not(:disabled){opacity:.8;}
+  select, textarea, input[type=text]{
+    width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--border);
+    border-radius:10px; padding:10px; font-size:14px; font-family:inherit;
+  }
+  textarea{min-height:150px; font-family:"Courier New",monospace; font-size:13px; resize:vertical;}
+  label{font-size:12px; color:var(--sub); display:block; margin:10px 0 4px;}
+  .status{
+    display:flex; align-items:center; gap:8px; font-size:13px; padding:9px 12px;
+    border-radius:10px; background:var(--bg); border:1px solid var(--border);
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--sub); flex-shrink:0;}
+  .dot.ok{background:var(--ok);}
+  .dot.warn{background:var(--warn);}
+  .dot.err{background:var(--danger);}
+  .note{font-size:12px; color:var(--sub); line-height:1.5; margin-top:8px;}
+  .note b{color:var(--ink);}
+  .preview{
+    background:#fff; color:#111; border-radius:8px; padding:14px; overflow-x:auto;
+    font-family:"Courier New",monospace; font-size:12px; white-space:pre; line-height:1.4;
+    border:1px solid var(--border);
+  }
+  .badge{
+    display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px;
+    background:var(--bg); border:1px solid var(--border); color:var(--sub); font-weight:600;
+  }
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  a{color:var(--accent);}
+  .seg{display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;}
+  .seg-btn{
+    flex:1; min-width:76px; text-align:center; padding:9px 10px; border-radius:20px;
+    border:1px solid var(--border); background:transparent; color:var(--ink);
+    font-size:12.5px; font-weight:600; cursor:pointer; user-select:none;
+  }
+  .seg-btn.active{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
+  .field-block{border-top:1px solid var(--border); padding-top:12px; margin-top:12px;}
+  .field-block:first-child{border-top:none; padding-top:0; margin-top:0;}
+  .field-title{font-size:13px; font-weight:700; margin-bottom:6px;}
+  .switch-row{display:flex; align-items:center; justify-content:space-between; margin-top:8px;}
+  .switch-row span{font-size:12.5px;}
+  .switch{
+    position:relative; width:42px; height:24px; border-radius:14px; background:var(--border);
+    border:none; cursor:pointer; flex-shrink:0;
+  }
+  .switch{flex:0 0 42px; min-width:0; padding:0;}
+  .switch.on{background:var(--accent);}
+  [hidden]{display:none !important;}
+  .switch::after{
+    content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+    background:#fff; transition:left .15s;
+  }
+  .switch.on::after{left:21px;}
+  details.settings{margin-top:6px;}
+  details.settings > summary{
+    cursor:pointer; font-size:13px; font-weight:600; color:var(--accent); list-style:none;
+    display:flex; align-items:center; gap:6px; padding:4px 0;
+  }
+  details.settings > summary::-webkit-details-marker{display:none;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .toast{
+    position:fixed; left:14px; right:14px; bottom:18px; max-width:520px; margin:0 auto;
+    background:var(--mono); color:#fff; padding:12px 16px; border-radius:12px; font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.3); display:none; z-index:50;
+  }
+
+  /* ---- Kartu Koneksi Printer: minimize / tutup ---- */
+  .card-head{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+  .card-head h2{margin:0; flex:1; min-width:0;}
+  .win-btn{
+    flex:0 0 auto; min-width:0; width:34px; height:34px; padding:0; border-radius:9px;
+    background:var(--bg); color:var(--ink); border:1px solid var(--border);
+    font-size:17px; line-height:1; font-weight:700; display:inline-flex; align-items:center; justify-content:center;
+  }
+  #connCard{scroll-margin-top:130px;}
+  #connCard.minimized .conn-body{display:none;}
+  .badge-default{
+    font-size:10.5px; padding:2px 7px; border-radius:20px; font-weight:700;
+    background:var(--accent); color:var(--accent-ink); display:none;
+  }
+  .badge-default.show{display:inline-block;}
+  .status.ok{border-color:var(--ok);}
+  .status.err{border-color:var(--danger);}
+  .status.warn{border-color:var(--warn);}
+  .status b{font-weight:700;}
+  .default-row{
+    display:flex; align-items:center; gap:10px; margin-top:10px; padding:10px 12px;
+    border:1px solid var(--border); border-radius:10px; background:var(--bg); cursor:pointer;
+  }
+  .default-row .txt{flex:1; font-size:13px; line-height:1.35;}
+  .default-row .txt small{display:block; color:var(--sub); font-size:11.5px; margin-top:2px;}
+
+  @keyframes blink{50%{opacity:.25;}}
+
+  /* Bilah atas aplikasi (selalu terlihat): judul, status printer, perkecil, keluar */
+  body{padding-top:0;}
+  .appbar{
+    position:sticky; top:0; z-index:45; margin:0 -14px 14px; padding:10px 14px 10px;
+    background:var(--bg); border-bottom:1px solid var(--border);
+  }
+  .appbar-in{max-width:520px; margin:0 auto;}
+  .appbar-top{display:flex; align-items:center; gap:8px;}
+  .appbar-top h1{flex:1; min-width:0; margin:0; font-size:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .appbar .sub{margin:2px 0 8px; font-size:12px;}
+  .conn-pill{
+    display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border-radius:10px;
+    font-size:13px; font-weight:600; background:var(--card); color:var(--ink);
+    border:1.5px solid var(--border); cursor:pointer; text-align:left;
+  }
+  .conn-pill .t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .conn-pill .go{color:var(--sub); font-size:12px; font-weight:600;}
+  .conn-pill.ok{border-color:var(--ok);}
+  .conn-pill.err{border-color:var(--danger);}
+  .conn-pill.warn{border-color:var(--warn);}
+  .conn-pill .dot{width:10px; height:10px;}
+  .conn-pill.err .dot, .conn-pill.warn .dot{animation:blink 1s infinite;}
+  .win-btn.exit{color:var(--danger);}
+
+  /* Mode ringkas (diperkecil): hanya bilah atas + panel cetak cepat */
+  .mini-panel{display:none;}
+  body.compact .mini-panel{display:block;}
+  body.compact .wrap > .card, body.compact .wrap > .note{display:none !important;}
+  body.compact .mini-panel.card{display:block !important;}
+
+  /* Lembar konfirmasi keluar & layar "sudah ditutup" */
+  .sheet-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:60; display:none; align-items:flex-end; justify-content:center;}
+  .sheet-bg.show{display:flex;}
+  .sheet{
+    background:var(--card); color:var(--ink); width:100%; max-width:520px; border-radius:16px 16px 0 0;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .sheet h3{margin:0 0 4px; font-size:16px;}
+  .sheet button{width:100%; margin-top:8px;}
+  button.danger{background:var(--danger); color:#fff;}
+  .closed-screen{
+    position:fixed; inset:0; z-index:70; background:var(--bg); display:none;
+    flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px;
+  }
+  .closed-screen.show{display:flex;}
+  .closed-screen .big{font-size:44px; margin-bottom:8px;}
+  .closed-screen button{flex:0 0 auto; margin-top:16px; min-width:200px;}
+
+  /* Banner struk masuk dari SB Sejahtera */
+  .job-banner{
+    border:2px solid var(--accent); border-radius:14px; padding:14px; margin-bottom:14px;
+    background:var(--card); display:none;
+  }
+  .job-banner.show{display:block;}
+  .job-banner h3{margin:0 0 6px; font-size:15px;}
+  .job-banner .note{margin-top:0;}
+  .mode-badge{font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; border:1px solid var(--border); color:var(--sub); margin-left:4px; white-space:nowrap;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="appbar">
+    <div class="appbar-in">
+      <div class="appbar-top">
+        <h1>🧾 SB Print</h1>
+        <span class="mode-badge" id="modeBadge"></span>
+        <button class="win-btn" id="btnAppMin" type="button" title="Perkecil" aria-label="Perkecil">–</button>
+        <button class="win-btn exit" id="btnAppExit" type="button" title="Keluar" aria-label="Keluar">✕</button>
+      </div>
+      <div class="sub">Jembatan cetak struk thermal untuk SB Sejahtera</div>
+      <button class="conn-pill" id="connChip" type="button" aria-label="Status printer, ketuk untuk membuka pengaturan printer">
+        <span class="dot" id="chipDot"></span><span class="t" id="chipText">Printer belum terhubung</span><span class="go">Atur ›</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel cetak cepat (tampil saat diperkecil) -->
+  <div class="card mini-panel">
+    <h2>⚡ Cetak Cepat</h2>
+    <div class="row">
+      <button id="btnMiniPrint">🖨️ Cetak Struk</button>
+      <button id="btnMiniReprint" class="secondary">🔁 Cetak Ulang</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <button id="btnMiniTest" class="secondary">🧪 Test Print</button>
+      <button id="btnMiniExpand" class="secondary">▢ Tampilan Penuh</button>
+    </div>
+    <div class="note">Mode ringkas. Status printer tetap terlihat di atas. Ketuk status untuk menyambungkan printer.</div>
+  </div>
+
+  <!-- Struk yang masuk dari SB Sejahtera -->
+  <div class="job-banner" id="jobBanner">
+    <h3 id="jobTitle">🧾 Struk dari SB Sejahtera siap dicetak</h3>
+    <div class="note" id="jobNote">Sambungkan printer, struk langsung tercetak.</div>
+    <details id="jobPreviewWrap" style="display:none; margin-top:8px;">
+      <summary style="cursor:pointer; font-size:12.5px; font-weight:600; color:var(--accent);">👁️ Lihat isi struk</summary>
+      <div class="preview" id="jobPreview" style="margin-top:6px; max-height:260px; overflow:auto;"></div>
+    </details>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnJobConnect">🔌 Sambungkan &amp; Cetak</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <button id="btnJobPrint" class="secondary" style="display:none;">🖨️ Cetak Sekarang</button>
+      <button id="btnJobBack" class="secondary">↩ Kembali ke SB Sejahtera</button>
+    </div>
+  </div>
+
+  <div class="card" id="installCard" style="display:none;">
+    <h2>📲 Pasang di HP</h2>
+    <div class="note">Instal SB Print sebagai aplikasi di layar utama HP Android supaya bisa dibuka seperti aplikasi biasa (tanpa alamat browser). Printer yang sudah disambungkan di browser juga langsung dikenali di aplikasi, begitu pula sebaliknya.</div>
+    <button id="btnInstall" style="margin-top:10px;">Instal Aplikasi</button>
+  </div>
+
+  <div class="card" id="openAppCard" style="display:none;">
+    <h2>📲 Aplikasi SB Print sudah terpasang</h2>
+    <div class="note">Mencetak dari browser ini tetap bisa. Kalau lebih suka tampilan aplikasi, buka di aplikasi SB Print (printer yang sama tetap dikenali).</div>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnOpenApp">Buka di Aplikasi</button>
+      <button id="btnStayBrowser" class="secondary">Tetap di Browser</button>
+    </div>
+  </div>
+
+  <div class="card" id="connCard">
+    <div class="card-head">
+      <h2>🔌 Koneksi Printer <span class="badge-default" id="badgeDefault">DEFAULT</span></h2>
+      <button class="win-btn" id="btnConnMin" type="button" title="Perkecil" aria-label="Perkecil">–</button>
+      <button class="win-btn" id="btnConnClose" type="button" title="Tutup" aria-label="Tutup">✕</button>
+    </div>
+    <div class="status" id="connStatus"><span class="dot" id="connDot"></span><span id="connText">Belum terhubung</span></div>
+
+    <div class="default-row" id="defaultRow" role="switch" aria-checked="false">
+      <div class="txt">
+        <b>Jadikan SB Print printer default</b>
+        <small id="defaultHint">Struk dari SB Sejahtera langsung dicetak otomatis tanpa tekan tombol Cetak.</small>
+      </div>
+      <button class="switch" id="swDefault" type="button" aria-label="Jadikan default"></button>
+    </div>
+
+    <div class="note" id="flagHint" style="display:none; border:1px dashed var(--warn); border-radius:10px; padding:10px; margin-top:10px;">
+      ⚠️ <b>Supaya printer tersambung otomatis seperti RawBT</b> (tanpa memilih printer tiap kali membuka SB Print), aktifkan sekali di Chrome HP:<br>
+      1. Ketik <code>chrome://flags</code> di kolom alamat Chrome<br>
+      2. Ketik <b>Web Bluetooth</b> di kolom pencarian, cari <b>Use the new permissions backend for Web Bluetooth</b><br>
+      3. Ubah ke <b>Enabled</b>, lalu tekan <b>Relaunch</b>.<br>
+      Tanpa ini, SB Print tetap bisa mencetak, tapi setiap kali halaman dibuka ulang perlu menekan "Sambungkan &amp; Cetak" sekali.
+    </div>
+
+    <div class="conn-body">
+    <div id="androidBlock" style="display:none; margin-top:10px;">
+      <label style="margin-top:0;">Pilih printer (aplikasi Android)</label>
+      <select id="androidDeviceSelect"></select>
+      <div class="row" style="margin-top:10px;">
+        <button id="btnAndroidRefresh" class="secondary">Muat Ulang Daftar</button>
+      </div>
+      <div class="note">
+        Mode aplikasi Android aktif — mendukung semua printer Bluetooth (termasuk Bluetooth Classic/SPP).
+        Pastikan printer sudah di-pairing lewat Pengaturan Bluetooth HP.
+      </div>
+      <button id="btnBtSettings" class="secondary" style="margin-top:8px;">⚙️ Buka Pengaturan Bluetooth HP (pairing)</button>
+      <button id="btnChangeServer" class="secondary" style="margin-top:8px; display:none;">🔧 Ganti Alamat Server</button>
+    </div>
+
+    <div id="browserBlock">
+      <div class="row" style="margin-top:10px;" id="rowConnected" hidden>
+        <button id="btnDisconnect" class="secondary">⏏️ Putuskan Sambungan</button>
+      </div>
+      <div class="row" style="margin-top:10px;" id="rowReconnect" hidden>
+        <button id="btnReconnect">🔄 Sambungkan Ulang ke <span id="lastPrinterName">printer terakhir</span></button>
+      </div>
+      <div class="row" style="margin-top:10px;" id="rowPick">
+        <button id="btnBt">Bluetooth (BLE)</button>
+        <button id="btnUsb" class="secondary">USB</button>
+      </div>
+      <div class="note">
+        Printer BT Cina 58/80mm umumnya pakai <b>Bluetooth Classic (SPP)</b>, yang tidak bisa diakses langsung oleh browser.
+        Tombol <b>Bluetooth</b> di sini hanya berfungsi untuk printer yang mendukung <b>BLE</b>.
+        Kalau tidak muncul di daftar / gagal konek, gunakan <b>USB</b> (jika printer punya kabel data),
+        atau pasang <b>aplikasi Android SB Print</b> untuk dukungan penuh ke semua printer BT.
+        Setelah tersambung sekali, browser akan mencoba menyambung otomatis ke printer yang sama tiap kali halaman dibuka.
+      </div>
+      <button id="btnForgetPrinter" class="secondary" style="margin-top:8px; display:none;">🗑️ Lupakan Printer Ini</button>
+    </div>
+    </div><!-- /conn-body -->
+  </div>
+
+<!-- Konfirmasi keluar -->
+<div class="sheet-bg" id="exitSheet">
+  <div class="sheet">
+    <h3>Keluar dari SB Print?</h3>
+    <div class="note" style="margin-top:0;">Printer akan diputus supaya tidak menguras baterai. Printer tetap diingat — lain kali dibuka, SB Print menyambung lagi otomatis.</div>
+    <button id="btnExitConfirm" class="danger">✕ Keluar &amp; Putuskan Printer</button>
+    <button id="btnExitDisconnect" class="secondary">⏏️ Putuskan Printer Saja (tetap di sini)</button>
+    <button id="btnExitCancel" class="secondary">Batal</button>
+  </div>
+</div>
+
+<!-- Layar setelah keluar (kalau HP tidak mengizinkan menutup otomatis) -->
+<div class="closed-screen" id="closedScreen">
+  <div class="big">👋</div>
+  <h2 style="margin:0 0 6px;">SB Print sudah ditutup</h2>
+  <div class="note" id="closedNote">Printer sudah diputus. Tekan tombol Home atau Kembali di HP untuk keluar sepenuhnya.</div>
+  <button id="btnReopen">🔄 Buka SB Print Lagi</button>
+</div>
+
+  <div class="card">
+    <h2>🏢 Kop Struk</h2>
+    <label>Nama Perusahaan</label>
+    <input type="text" id="fCompany" placeholder="SB SEJAHTERA">
+    <label>Alamat</label>
+    <input type="text" id="fAddress" placeholder="Jl. Selatan Ps. Jamblang - CRB">
+    <label>No. HP</label>
+    <input type="text" id="fPhone" placeholder="085178332150">
+
+    <label>Logo Perusahaan (opsional)</label>
+    <div class="row" style="align-items:center; gap:10px;">
+      <img id="logoPreview" style="display:none; max-height:48px; max-width:90px; border:1px solid var(--border); border-radius:6px; background:#fff; padding:2px;">
+      <input type="file" accept="image/*" id="fLogo" style="flex:1;">
+    </div>
+    <button id="btnRemoveLogo" class="secondary" style="margin-top:8px; display:none;">🗑️ Hapus Logo</button>
+    <div class="note">Logo dicetak hitam-putih (dithering otomatis) di atas nama perusahaan. Hasil terbaik: gambar kontras tinggi, latar putih.</div>
+
+    <details class="settings" id="detSettings">
+      <summary id="summarySettings">⚙️ Buka Pengaturan Format Kop &amp; Kertas</summary>
+
+      <div class="note" style="margin-top:2px;">
+        Pengaturan ini tersimpan di HP ini dan berlaku untuk semua struk berikutnya.
+      </div>
+
+      <div class="field-block">
+        <div class="field-title">Nama Perusahaan</div>
+        <label style="margin-top:0;">Ukuran</label>
+        <div class="seg" data-seg="companySize">
+          <div class="seg-btn" data-val="kecil">Kecil</div>
+          <div class="seg-btn" data-val="sedang">Sedang</div>
+          <div class="seg-btn" data-val="besar">Besar</div>
+        </div>
+        <div class="switch-row">
+          <span>Tebal</span>
+          <button class="switch" id="swCompanyBold" type="button"></button>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <div class="field-title">Alamat</div>
+        <label style="margin-top:0;">Ukuran</label>
+        <div class="seg" data-seg="addressSize">
+          <div class="seg-btn" data-val="kecil">Kecil</div>
+          <div class="seg-btn" data-val="sedang">Sedang</div>
+          <div class="seg-btn" data-val="besar">Besar</div>
+        </div>
+        <div class="switch-row">
+          <span>Tebal</span>
+          <button class="switch" id="swAddressBold" type="button"></button>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <div class="field-title">No. HP</div>
+        <label style="margin-top:0;">Ukuran</label>
+        <div class="seg" data-seg="phoneSize">
+          <div class="seg-btn" data-val="kecil">Kecil</div>
+          <div class="seg-btn" data-val="sedang">Sedang</div>
+          <div class="seg-btn" data-val="besar">Besar</div>
+        </div>
+        <div class="switch-row">
+          <span>Tebal</span>
+          <button class="switch" id="swPhoneBold" type="button"></button>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <div class="field-title">Posisi Kop Struk</div>
+        <div class="seg" data-seg="headerAlign">
+          <div class="seg-btn" data-val="kiri">Kiri</div>
+          <div class="seg-btn" data-val="tengah">Tengah</div>
+          <div class="seg-btn" data-val="kanan">Kanan</div>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <div class="field-title">Jarak Kertas</div>
+        <div class="grid3">
+          <div>
+            <label style="margin-top:0;">Jarak Atas (baris)</label>
+            <input type="text" inputmode="numeric" id="fMarginTop" value="1">
+          </div>
+          <div>
+            <label style="margin-top:0;">Jarak Bawah (baris)</label>
+            <input type="text" inputmode="numeric" id="fMarginBottom" value="3">
+          </div>
+        </div>
+        <div class="note">Jarak bawah menentukan seberapa jauh kertas didorong sebelum dipotong. Kalau tulisan paling bawah ikut kepotong, besarkan angkanya.</div>
+      </div>
+
+      <button id="btnSaveSettings" style="margin-top:16px;">💾 Simpan Pengaturan</button>
+      <div class="note">Perubahan sebenarnya sudah tersimpan otomatis setiap kali diubah. Tombol ini untuk memastikan sekaligus menutup panelnya.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>📄 Isi Struk</h2>
+    <label>Lebar kertas</label>
+    <select id="paperWidth">
+      <option value="32">58mm (32 karakter)</option>
+      <option value="48" selected>80mm (48 karakter)</option>
+    </select>
+    <label>Isi/badan struk (item, total, dll — rata kiri). Apit satu baris dengan ** untuk cetak tebal, mis. **TOTAL Rp 30.000**</label>
+    <textarea id="receiptText" placeholder="--------------------------------
+Sabun Cuci x2        Rp 24.000
+Garam 1kg  x1        Rp  6.000
+--------------------------------
+TOTAL                Rp 30.000
+
+Terima kasih!"></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="btnPreview" class="secondary">Pratinjau</button>
+      <button id="btnPrint">Cetak</button>
+    </div>
+
+    <label>Kode QR (opsional)</label>
+    <input type="text" id="fQrCode" placeholder="mis. link pembayaran, ID transaksi">
+    <label>Barcode (opsional)</label>
+    <input type="text" id="fBarcode" placeholder="mis. nomor invoice">
+  </div>
+
+  <div class="card">
+    <h2>🛠️ Alat Tambahan</h2>
+    <div class="row">
+      <button id="btnTestPrint" class="secondary">🧪 Test Print</button>
+      <button id="btnCashDrawer" class="secondary">💰 Buka Laci Kas</button>
+    </div>
+    <button id="btnReprint" class="secondary" style="margin-top:8px; display:none;">🔁 Cetak Ulang Terakhir</button>
+  </div>
+
+  <div class="card" id="previewCard" style="display:none;">
+    <h2>👁️ Pratinjau <span class="badge" id="widthBadge"></span></h2>
+    <div class="preview" id="previewOut"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔗 Integrasi dari SB Sejahtera</h2>
+    <div class="note">
+      Halaman ini bisa dipanggil dengan parameter URL, contoh:<br>
+      <code style="word-break:break-all;">?data=BASE64_BODY&company=BASE64_NAMA&address=BASE64_ALAMAT&phone=BASE64_HP&qr=BASE64_QR&barcode=BASE64_BARCODE&autoprint=1&width=48</code><br><br>
+      <b>data</b>: isi/badan struk (item, total, dll), Base64 UTF-8. Apit satu baris dengan ** untuk tebal.<br>
+      <b>company</b>, <b>address</b>, <b>phone</b>: opsional — kalau dikirim, akan menimpa kolom Kop Struk & dicetak sesuai Pengaturan Format yang tersimpan di HP ini.<br>
+      <b>qr</b>, <b>barcode</b>: opsional, Base64 — dicetak sebagai kode QR/barcode asli printer (tajam, bukan gambar).<br>
+      <b>autoprint</b>: 1 untuk langsung cetak begitu printer tersambung (sama seperti sakelar "Jadikan SB Print printer default"). Kalau printer belum tersambung, muncul tombol besar "Sambungkan &amp; Cetak".<br>
+      <b>return</b>: opsional, alamat (bukan Base64) untuk tombol "Kembali ke SB Sejahtera" setelah cetak.<br>
+      <b>width</b>: 32 atau 48.<br><br>
+      Logo perusahaan diatur di kartu Kop Struk (tersimpan di HP ini, ikut tercetak di semua struk otomatis — tidak dikirim lewat URL).
+    </div>
+  </div>
+
+  <div class="note" style="text-align:center;">
+    SB Print · bisa dipakai dari browser maupun aplikasi terpasang — izin printer keduanya sama.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let btDevice=null, btChar=null, usbDevice=null, usbEndpoint=null, usbIface=null;
+
+function toast(msg, ms=2600){
+  const t=$('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', ms);
+}
+// ---------- Status koneksi (kartu + chip mengambang + judul tab) ----------
+// setStatus = pesan status sementara (mis. "Mengirim…"); chip selalu menampilkan keadaan koneksi SEBENARNYA.
+function setStatus(kind, text){
+  $('connDot').className='dot '+(kind||'');
+  $('connStatus').className='status '+(kind||'');
+  $('connText').textContent=text;
+  renderConn();
+}
+function isConnected(){
+  if(isAndroidApp) return !!androidSelectedAddress;
+  if(btChar && btDevice && btDevice.gatt && btDevice.gatt.connected) return true;
+  if(usbDevice && usbDevice.opened) return true;
+  return false;
+}
+function connectedName(){
+  if(isAndroidApp){ const d=androidDevices.find(x=>x.address===androidSelectedAddress); return d?(d.name||d.address):'printer'; }
+  if(btDevice && btChar) return (btDevice.name||'printer')+' · Bluetooth';
+  if(usbDevice) return (usbDevice.productName||'printer')+' · USB';
+  return '';
+}
+let bleReconnecting=false;
+let connReady=false; // true setelah semua variabel & inisialisasi selesai
+function renderConn(){
+  const chip=$('connChip');
+  if(!chip || !connReady) return;
+  let kind, text;
+  if(isConnected()){ kind='ok'; text=(isAndroidApp?'Printer siap · ':'Printer terhubung · ')+connectedName(); }
+  else if(bleReconnecting){ kind='warn'; text='Printer terputus — menyambung ulang…'; }
+  else if(hasRememberedPrinter()){ kind='err'; text='Printer TERPUTUS — ketuk untuk sambungkan'; }
+  else { kind=''; text='Printer belum terhubung'; }
+  chip.className='conn-pill '+kind;
+  $('chipDot').className='dot '+kind;
+  $('chipText').textContent=text;
+  document.title=(kind==='ok'?'🟢 ':kind?'🔴 ':'')+'SB Print';
+  // tombol di kartu
+  if(!isAndroidApp && $('rowConnected')){
+    const conn=isConnected();
+    $('rowConnected').hidden=!conn;
+    $('rowReconnect').hidden=conn || !hasRememberedPrinter() || bleReconnecting;
+    $('lastPrinterName').textContent=lastPrinterName() || 'printer terakhir';
+  }
+  updateJobBanner();
+}
+function hasRememberedPrinter(){
+  try{ return !!(localStorage.getItem('sbprint-ble-device-id') || localStorage.getItem('sbprint-usb-remembered')); }catch(e){ return false; }
+}
+function lastPrinterName(){
+  try{ return localStorage.getItem('sbprint-last-printer-name')||''; }catch(e){ return ''; }
+}
+
+// ---------- Minimize / Tutup kartu Koneksi Printer ----------
+const LS_CONN_UI='sbprint-conn-ui'; // 'open' | 'min' | 'closed'
+let connUi='open';
+try{ connUi=localStorage.getItem(LS_CONN_UI)||'open'; }catch(e){}
+function applyConnUi(){
+  const card=$('connCard');
+  card.style.display = connUi==='closed' ? 'none' : '';
+  card.classList.toggle('minimized', connUi==='min');
+  $('btnConnMin').textContent = connUi==='min' ? '▢' : '–';
+  $('btnConnMin').title = connUi==='min' ? 'Perbesar' : 'Perkecil';
+  $('btnConnMin').setAttribute('aria-label', $('btnConnMin').title);
+  try{ localStorage.setItem(LS_CONN_UI, connUi); }catch(e){}
+}
+function initConnUi(){
+  $('btnConnMin').onclick=()=>{ connUi = connUi==='min' ? 'open' : 'min'; applyConnUi(); };
+  $('btnConnClose').onclick=()=>{
+    connUi='closed'; applyConnUi();
+    toast('Kartu printer ditutup. Status tetap terlihat di atas — ketuk untuk membuka lagi.');
+  };
+  $('connChip').onclick=()=>{
+    setCompact(false);
+    connUi='open'; applyConnUi();
+    $('connCard').scrollIntoView({behavior:'smooth', block:'start'});
+  };
+  applyConnUi();
+  initAppControls();
+}
+
+// ---------- Perkecil (mode ringkas) & Keluar — untuk aplikasi maupun browser ----------
+const LS_COMPACT='sbprint-compact';
+function setCompact(on){
+  document.body.classList.toggle('compact', on);
+  $('btnAppMin').textContent = on ? '▢' : '–';
+  $('btnAppMin').title = on ? 'Tampilan penuh' : 'Perkecil';
+  $('btnAppMin').setAttribute('aria-label', $('btnAppMin').title);
+  try{ localStorage.setItem(LS_COMPACT, on?'1':'0'); }catch(e){}
+}
+async function disconnectPrinter(){
+  if(btDevice && btDevice.gatt && btDevice.gatt.connected){
+    manualDisconnect=true;
+    try{ btDevice.gatt.disconnect(); }catch(e){}
+  }
+  btChar=null;
+  if(usbDevice){ try{ await usbDevice.close(); }catch(e){} usbDevice=null; }
+}
+function initAppControls(){
+  let compact=false;
+  try{ compact=localStorage.getItem(LS_COMPACT)==='1'; }catch(e){}
+  setCompact(compact);
+  $('btnAppMin').onclick=()=>{
+    const on=!document.body.classList.contains('compact');
+    setCompact(on);
+    window.scrollTo({top:0});
+    if(on) toast('Mode ringkas — tekan ▢ untuk tampilan penuh');
+  };
+  $('btnMiniExpand').onclick=()=>setCompact(false);
+  $('btnMiniPrint').onclick=()=>$('btnPrint').click();
+  $('btnMiniReprint').onclick=()=>$('btnReprint').click();
+  $('btnMiniTest').onclick=()=>$('btnTestPrint').click();
+
+  const sheet=$('exitSheet');
+  $('btnAppExit').onclick=()=>sheet.classList.add('show');
+  $('btnExitCancel').onclick=()=>sheet.classList.remove('show');
+  sheet.addEventListener('click', e=>{ if(e.target===sheet) sheet.classList.remove('show'); });
+  $('btnExitDisconnect').onclick=async()=>{
+    sheet.classList.remove('show');
+    await disconnectPrinter();
+    setStatus('','Sambungan diputus. Printer tetap diingat.');
+    toast('Printer diputus');
+  };
+  $('btnExitConfirm').onclick=async()=>{
+    sheet.classList.remove('show');
+    await disconnectPrinter();
+    setStatus('','Sambungan diputus. Printer tetap diingat.');
+    // Android app (APK) punya fungsi keluar sendiri
+    try{ if(window.AndroidBridge && window.AndroidBridge.exitApp){ window.AndroidBridge.exitApp(); return; } }catch(e){}
+    try{ window.close(); }catch(e){}
+    // Kalau HP/browser tidak mengizinkan menutup otomatis, tampilkan layar "sudah ditutup"
+    setTimeout(()=>{
+      $('closedNote').textContent = isStandalone
+        ? 'Printer sudah diputus. Tekan tombol Home atau Kembali di HP untuk keluar dari aplikasi.'
+        : 'Printer sudah diputus. Tutup tab ini dari browser, atau tekan tombol Kembali di HP.';
+      $('closedScreen').classList.add('show');
+    }, 300);
+  };
+  $('btnReopen').onclick=()=>{ location.href=location.href.split('?')[0].split('#')[0]; };
+}
+
+// ---------- Printer default ----------
+const LS_DEFAULT='sbprint-default';
+function isDefault(){ try{ return localStorage.getItem(LS_DEFAULT)==='1'; }catch(e){ return false; } }
+function renderDefault(){
+  const on=isDefault();
+  $('swDefault').classList.toggle('on', on);
+  $('defaultRow').setAttribute('aria-checked', on?'true':'false');
+  $('badgeDefault').classList.toggle('show', on);
+  $('defaultHint').textContent = on
+    ? 'AKTIF — setiap struk dari SB Sejahtera langsung dicetak otomatis lewat SB Print.'
+    : 'Struk dari SB Sejahtera langsung dicetak otomatis tanpa tekan tombol Cetak.';
+}
+function initDefault(){
+  $('defaultRow').onclick=()=>{
+    const on=!isDefault();
+    try{ localStorage.setItem(LS_DEFAULT, on?'1':'0'); }catch(e){}
+    renderDefault();
+    toast(on ? 'SB Print dijadikan printer default ✓' : 'SB Print tidak lagi default');
+  };
+  renderDefault();
+}
+
+// ---------- Pengaturan Kop Struk (persisted) ----------
+const DEFAULT_SETTINGS = {
+  companySize:'besar', companyBold:true,
+  addressSize:'kecil', addressBold:false,
+  phoneSize:'kecil', phoneBold:false,
+  headerAlign:'tengah',
+  marginTop:1, marginBottom:3
+};
+let settings = loadJson('sbprint-settings', DEFAULT_SETTINGS);
+let profile = loadJson('sbprint-profile', {company:'',address:'',phone:''});
+
+function loadJson(key, fallback){
+  try{
+    const raw=localStorage.getItem(key);
+    if(!raw) return {...fallback};
+    return {...fallback, ...JSON.parse(raw)};
+  }catch(e){ return {...fallback}; }
+}
+function saveSettings(){ try{ localStorage.setItem('sbprint-settings', JSON.stringify(settings)); }catch(e){} }
+function saveProfile(){ try{ localStorage.setItem('sbprint-profile', JSON.stringify(profile)); }catch(e){} }
+
+function refreshPreviewIfOpen(){
+  if($('previewCard').style.display!=='none') $('btnPreview').click();
+}
+function applySegUI(){
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const key=seg.getAttribute('data-seg');
+    seg.querySelectorAll('.seg-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.getAttribute('data-val')===settings[key]);
+      btn.onclick=()=>{
+        settings[key]=btn.getAttribute('data-val');
+        saveSettings();
+        applySegUI();
+        refreshPreviewIfOpen();
+      };
+    });
+  });
+}
+function applySwitch(id, key){
+  const el=$(id);
+  const render=()=>el.classList.toggle('on', !!settings[key]);
+  render();
+  el.onclick=()=>{ settings[key]=!settings[key]; saveSettings(); render(); refreshPreviewIfOpen(); };
+}
+function initSettingsUi(){
+  applySegUI();
+  applySwitch('swCompanyBold','companyBold');
+  applySwitch('swAddressBold','addressBold');
+  applySwitch('swPhoneBold','phoneBold');
+
+  $('detSettings').addEventListener('toggle', ()=>{
+    $('summarySettings').textContent = $('detSettings').open
+      ? '▲ Tutup Pengaturan Format Kop & Kertas'
+      : '⚙️ Buka Pengaturan Format Kop & Kertas';
+  });
+
+  $('fMarginTop').value=settings.marginTop;
+  $('fMarginBottom').value=settings.marginBottom;
+  $('fMarginTop').onchange=()=>{ settings.marginTop=Math.max(0,parseInt($('fMarginTop').value,10)||0); saveSettings(); refreshPreviewIfOpen(); };
+  $('fMarginBottom').onchange=()=>{ settings.marginBottom=Math.max(0,parseInt($('fMarginBottom').value,10)||0); saveSettings(); refreshPreviewIfOpen(); };
+
+  $('fCompany').value=profile.company;
+  $('fAddress').value=profile.address;
+  $('fPhone').value=profile.phone;
+  $('fCompany').onchange=()=>{ profile.company=$('fCompany').value; saveProfile(); };
+  $('fAddress').onchange=()=>{ profile.address=$('fAddress').value; saveProfile(); };
+  $('fPhone').onchange=()=>{ profile.phone=$('fPhone').value; saveProfile(); };
+  ['fCompany','fAddress','fPhone'].forEach(id=>$(id).addEventListener('input', refreshPreviewIfOpen));
+  $('receiptText').addEventListener('input', refreshPreviewIfOpen);
+  $('fQrCode').addEventListener('input', refreshPreviewIfOpen);
+  $('fBarcode').addEventListener('input', refreshPreviewIfOpen);
+  $('paperWidth').addEventListener('change', refreshPreviewIfOpen);
+
+  renderLogoPreview();
+  $('fLogo').onchange=(e)=>{
+    const file=e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      profile.logoDataUrl=reader.result;
+      saveProfile();
+      renderLogoPreview();
+      refreshPreviewIfOpen();
+      toast('Logo tersimpan');
+    };
+    reader.readAsDataURL(file);
+  };
+  $('btnRemoveLogo').onclick=()=>{
+    profile.logoDataUrl='';
+    saveProfile();
+    renderLogoPreview();
+    refreshPreviewIfOpen();
+    $('fLogo').value='';
+  };
+  try{
+    if(localStorage.getItem('sbprint-last-job')) $('btnReprint').style.display='block';
+  }catch(e){}
+
+  $('btnSaveSettings').onclick=()=>{
+    // Semua field sudah tersimpan otomatis per-perubahan; tombol ini memastikan
+    // input yang belum "blur" (mis. baru diketik) ikut tersimpan, lalu menutup panel.
+    profile.company=$('fCompany').value;
+    profile.address=$('fAddress').value;
+    profile.phone=$('fPhone').value;
+    saveProfile();
+    settings.marginTop=Math.max(0,parseInt($('fMarginTop').value,10)||0);
+    settings.marginBottom=Math.max(0,parseInt($('fMarginBottom').value,10)||0);
+    saveSettings();
+    $('detSettings').open=false;
+    toast('Pengaturan tersimpan ✓');
+    if($('previewCard').style.display!=='none'){
+      $('btnPreview').click();
+    }
+  };
+}
+
+function renderLogoPreview(){
+  const img=$('logoPreview');
+  if(profile.logoDataUrl){
+    img.src=profile.logoDataUrl;
+    img.style.display='inline-block';
+    $('btnRemoveLogo').style.display='block';
+  }else{
+    img.style.display='none';
+    $('btnRemoveLogo').style.display='none';
+  }
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+const SIZE_PX={kecil:'13px', sedang:'18px', besar:'24px'};
+const ALIGN_CSS={kiri:'left', tengah:'center', kanan:'right'};
+
+// ---------- ESC/POS encoding ----------
+const SIZE_BYTE={kecil:0x00, sedang:0x01, besar:0x11};
+const ALIGN_BYTE={kiri:0x00, tengah:0x01, kanan:0x02};
+
+function buildHeaderBytes(header, width){
+  const ESC=0x1B, GS=0x1D;
+  const bytes=[];
+  const push=(...b)=>b.forEach(x=>bytes.push(x));
+  const enc=new TextEncoder();
+  const headerAlignByte=ALIGN_BYTE[settings.headerAlign] ?? 0x01;
+  const fields=[
+    {text:header.company, size:settings.companySize, bold:settings.companyBold},
+    {text:header.address, size:settings.addressSize, bold:settings.addressBold},
+    {text:header.phone, size:settings.phoneSize, bold:settings.phoneBold},
+  ];
+  const hasHeader = fields.some(f=>f.text && f.text.trim());
+  if(hasHeader){
+    push(ESC,0x61,headerAlignByte);
+    for(const f of fields){
+      if(!f.text || !f.text.trim()) continue;
+      push(ESC,0x45,f.bold?1:0);
+      push(GS,0x21,SIZE_BYTE[f.size] ?? 0x00);
+      for(const w of wrapLine(f.text, width)){
+        push(...enc.encode(w));
+        push(0x0A);
+      }
+    }
+    push(ESC,0x45,0); // bold off
+    push(GS,0x21,0x00); // size normal
+    push(0x0A);
+  }
+  return bytes;
+}
+
+// Badan struk: baris yang diapit **...** dicetak tebal satu baris penuh
+function buildBodyBytes(body, width){
+  const ESC=0x1B;
+  const bytes=[];
+  const push=(...b)=>b.forEach(x=>bytes.push(x));
+  const enc=new TextEncoder();
+  push(ESC,0x61,0x00); // rata kiri
+  for(const rawLine of body.split('\n')){
+    let line=rawLine, bold=false;
+    if(line.startsWith('**') && line.endsWith('**') && line.length>=4){
+      bold=true; line=line.slice(2,-2);
+    }
+    if(bold) push(ESC,0x45,1);
+    for(const w of wrapLine(line, width)){
+      push(...enc.encode(w));
+      push(0x0A);
+    }
+    if(bold) push(ESC,0x45,0);
+  }
+  return bytes;
+}
+
+function buildFooterBytes(){
+  const GS=0x1D;
+  const bytes=[];
+  for(let i=0;i<(settings.marginBottom??3);i++) bytes.push(0x0A);
+  bytes.push(GS,0x56,0x42,0x00); // full cut
+  return bytes;
+}
+
+// QR code native ESC/POS (GS ( k) - tajam, tidak perlu konversi gambar
+function buildQrBytes(text){
+  if(!text) return [];
+  const ESC=0x1B, GS=0x1D;
+  const bytes=[];
+  const push=(...b)=>b.forEach(x=>bytes.push(x));
+  const enc=new TextEncoder();
+  const data=enc.encode(text);
+  const len=data.length+3;
+  const pL=len & 0xFF, pH=(len>>8)&0xFF;
+  push(ESC,0x61,0x01); // center
+  push(GS,0x28,0x6B,0x04,0x00,0x31,0x41,0x32,0x00); // model
+  push(GS,0x28,0x6B,0x03,0x00,0x31,0x43,0x06); // module size 6
+  push(GS,0x28,0x6B,0x03,0x00,0x31,0x45,0x31); // error correction level M
+  push(GS,0x28,0x6B,pL,pH,0x31,0x50,0x30, ...data); // store data
+  push(GS,0x28,0x6B,0x03,0x00,0x31,0x51,0x30); // print
+  push(0x0A);
+  push(ESC,0x61,0x00);
+  return bytes;
+}
+
+// Barcode CODE128 native ESC/POS (GS k)
+function buildBarcodeBytes(text){
+  if(!text) return [];
+  const GS=0x1D, ESC=0x1B;
+  const bytes=[];
+  const push=(...b)=>b.forEach(x=>bytes.push(x));
+  const enc=new TextEncoder();
+  const data=enc.encode('{B'+text); // {B = pakai charset CODE128 B
+  push(ESC,0x61,0x01); // center
+  push(GS,0x68,0x50); // tinggi barcode 80 dot
+  push(GS,0x77,0x02); // lebar bar
+  push(GS,0x48,0x02); // teks angka tampil di bawah barcode
+  push(GS,0x6B,0x49,data.length, ...data); // GS k m=73 (CODE128) n data
+  push(0x0A);
+  push(ESC,0x61,0x00);
+  return bytes;
+}
+
+// Versi ringkas dipakai oleh Test Print (tanpa logo/QR/barcode)
+function buildEscPos(header, body, width){
+  const ESC=0x1B;
+  const bytes=[ESC,0x40];
+  for(let i=0;i<(settings.marginTop||0);i++) bytes.push(0x0A);
+  bytes.push(...buildHeaderBytes(header, width));
+  bytes.push(...buildBodyBytes(body, width));
+  bytes.push(...buildFooterBytes());
+  return new Uint8Array(bytes);
+}
+
+// Versi lengkap dipakai oleh tombol Cetak utama: logo + kop + badan + QR + barcode + footer
+async function buildFullReceipt(header, body, width, qrText, barcodeText){
+  const ESC=0x1B;
+  const bytes=[ESC,0x40];
+  for(let i=0;i<(settings.marginTop||0);i++) bytes.push(0x0A);
+
+  if(profile.logoDataUrl){
+    try{
+      const raster=await imageDataUrlToRaster(profile.logoDataUrl, width===32?384:576);
+      bytes.push(ESC,0x61, ALIGN_BYTE[settings.headerAlign] ?? 0x01);
+      bytes.push(...raster);
+      bytes.push(0x0A);
+    }catch(e){ /* logo gagal diproses, lanjut tanpa logo */ }
+  }
+
+  bytes.push(...buildHeaderBytes(header, width));
+  bytes.push(...buildBodyBytes(body, width));
+  if(qrText) bytes.push(...buildQrBytes(qrText));
+  if(barcodeText) bytes.push(...buildBarcodeBytes(barcodeText));
+  bytes.push(...buildFooterBytes());
+  return new Uint8Array(bytes);
+}
+
+function wrapLine(line, width){
+  if(line.length<=width) return [line];
+  const out=[];
+  let rest=line;
+  while(rest.length>width){ out.push(rest.slice(0,width)); rest=rest.slice(width); }
+  if(rest.length) out.push(rest);
+  return out;
+}
+
+// ---------- Logo: konversi gambar ke bitmap 1-bit (dithering Floyd-Steinberg) untuk GS v 0 ----------
+function imageDataUrlToRaster(dataUrl, widthDots){
+  return new Promise((resolve, reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const scale=widthDots/img.width;
+        const h=Math.max(1, Math.round(img.height*scale));
+        const canvas=document.createElement('canvas');
+        canvas.width=widthDots; canvas.height=h;
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,widthDots,h);
+        ctx.drawImage(img,0,0,widthDots,h);
+        const imgData=ctx.getImageData(0,0,widthDots,h);
+        const gray=new Float32Array(widthDots*h);
+        for(let i=0;i<widthDots*h;i++){
+          const r=imgData.data[i*4], g=imgData.data[i*4+1], b=imgData.data[i*4+2];
+          gray[i]=0.299*r+0.587*g+0.114*b;
+        }
+        // Floyd-Steinberg dithering
+        for(let y=0;y<h;y++){
+          for(let x=0;x<widthDots;x++){
+            const idx=y*widthDots+x;
+            const old=gray[idx];
+            const nw=old<128?0:255;
+            const err=old-nw;
+            gray[idx]=nw;
+            if(x+1<widthDots) gray[idx+1]+=err*7/16;
+            if(y+1<h){
+              if(x>0) gray[idx+widthDots-1]+=err*3/16;
+              gray[idx+widthDots]+=err*5/16;
+              if(x+1<widthDots) gray[idx+widthDots+1]+=err*1/16;
+            }
+          }
+        }
+        const widthBytes=Math.ceil(widthDots/8);
+        const packed=new Uint8Array(widthBytes*h);
+        for(let y=0;y<h;y++){
+          for(let x=0;x<widthDots;x++){
+            if(gray[y*widthDots+x]<128){
+              packed[y*widthBytes + (x>>3)] |= (0x80 >> (x&7));
+            }
+          }
+        }
+        const GS=0x1D;
+        const xL=widthBytes&0xFF, xH=(widthBytes>>8)&0xFF;
+        const yL=h&0xFF, yH=(h>>8)&0xFF;
+        resolve([GS,0x76,0x30,0x00,xL,xH,yL,yH, ...packed]);
+      }catch(e){ reject(e); }
+    };
+    img.onerror=reject;
+    img.src=dataUrl;
+  });
+}
+
+// ---------- Preview ----------
+function getHeader(){
+  return {
+    company: $('fCompany').value,
+    address: $('fAddress').value,
+    phone: $('fPhone').value
+  };
+}
+$('btnPreview').onclick=()=>{
+  const width=parseInt($('paperWidth').value,10);
+  const header=getHeader();
+  const body=$('receiptText').value;
+  const qr=$('fQrCode').value.trim();
+  const barcode=$('fBarcode').value.trim();
+  const align=ALIGN_CSS[settings.headerAlign] || 'center';
+
+  let html='';
+  if(profile.logoDataUrl){
+    html += `<div style="text-align:${align}; margin-bottom:6px;"><img src="${profile.logoDataUrl}" style="max-width:70%; max-height:80px; filter:grayscale(1) contrast(1.4);"></div>`;
+  }
+  const fields=[
+    {text:header.company, size:settings.companySize, bold:settings.companyBold},
+    {text:header.address, size:settings.addressSize, bold:settings.addressBold},
+    {text:header.phone, size:settings.phoneSize, bold:settings.phoneBold},
+  ];
+  for(const f of fields){
+    if(!f.text || !f.text.trim()) continue;
+    html += `<div style="text-align:${align}; font-weight:${f.bold?'700':'400'}; font-size:${SIZE_PX[f.size]}; margin-bottom:2px;">${escapeHtml(f.text)}</div>`;
+  }
+  if(html) html += '<div style="height:8px;"></div>';
+
+  const bodyHtml=body.split('\n').flatMap(l=>{
+    let line=l, bold=false;
+    if(line.startsWith('**') && line.endsWith('**') && line.length>=4){ bold=true; line=line.slice(2,-2); }
+    return wrapLine(line,width).map(w=>`<span style="font-weight:${bold?'700':'400'};">${escapeHtml(w)}</span>`);
+  }).join('\n');
+  html += `<div style="text-align:left;">${bodyHtml}</div>`;
+
+  if(qr) html += `<div style="text-align:center; margin-top:10px; padding:10px; border:1px dashed var(--sub); font-size:11px;">▦▦▦ QR CODE ▦▦▦<br>${escapeHtml(qr)}</div>`;
+  if(barcode) html += `<div style="text-align:center; margin-top:10px; padding:10px; border:1px dashed var(--sub); font-size:11px;">‖|‖|‖ BARCODE ‖|‖|‖<br>${escapeHtml(barcode)}</div>`;
+
+  $('previewOut').innerHTML=html;
+  $('widthBadge').textContent=width+' kol';
+  $('previewCard').style.display='block';
+};
+
+// ---------- Jembatan Aplikasi Android (kalau dibuka di dalam APK SB Print) ----------
+let androidDevices=[];
+let androidSelectedAddress=null;
+
+function bytesToBase64(bytes){
+  let binary='';
+  for(let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+const LS_ANDROID_LAST='sbprint-android-last-device';
+
+function refreshAndroidDevices(){
+  try{
+    androidDevices=JSON.parse(window.AndroidBridge.getPairedDevices());
+  }catch(e){ androidDevices=[]; }
+  const sel=$('androidDeviceSelect');
+  sel.innerHTML='';
+  if(androidDevices.length===0){
+    sel.innerHTML='<option value="">(tidak ada printer terpasang — pairing dulu lewat Pengaturan Bluetooth HP)</option>';
+    androidSelectedAddress=null;
+    setStatus('warn','Belum ada printer terpasang');
+    return;
+  }
+  androidDevices.forEach(d=>{
+    const opt=document.createElement('option');
+    opt.value=d.address; opt.textContent=d.name||d.address;
+    sel.appendChild(opt);
+  });
+  // Utamakan printer default yang tersimpan di aplikasi (dipakai juga untuk cetak dari SB Sejahtera)
+  let lastAddr=null;
+  try{ if(window.AndroidBridge.getDefaultPrinter) lastAddr=window.AndroidBridge.getDefaultPrinter()||null; }catch(e){}
+  if(!lastAddr){ try{ lastAddr=localStorage.getItem(LS_ANDROID_LAST); }catch(e){} }
+  const match=androidDevices.find(d=>d.address===lastAddr);
+  const chosen=match||androidDevices[0];
+  androidSelectedAddress=chosen.address;
+  sel.value=androidSelectedAddress;
+  if(!match) saveAndroidDefault(chosen);
+  setStatus('ok','Siap — printer: '+(chosen.name||androidSelectedAddress));
+}
+function saveAndroidDefault(d){
+  try{ localStorage.setItem(LS_ANDROID_LAST, d.address); }catch(e){}
+  try{ if(window.AndroidBridge.setDefaultPrinter) window.AndroidBridge.setDefaultPrinter(d.address, d.name||d.address); }catch(e){}
+}
+// Struk yang dicetak di latar belakang (dari SB Sejahtera) ikut bisa dicetak ulang dari sini
+function syncLastJobFromApp(){
+  try{
+    if(!window.AndroidBridge || !window.AndroidBridge.getLastJob) return;
+    const b64=window.AndroidBridge.getLastJob();
+    if(b64){ localStorage.setItem('sbprint-last-job', b64); const r=document.getElementById('btnReprint'); if(r) r.style.display='block'; }
+  }catch(e){}
+}
+
+function initAndroidBridge(){
+  if(!window.AndroidBridge) return false;
+  $('androidBlock').style.display='block';
+  $('browserBlock').style.display='none';
+  $('androidDeviceSelect').onchange=(e)=>{
+    androidSelectedAddress=e.target.value;
+    const d=androidDevices.find(x=>x.address===androidSelectedAddress);
+    if(d) saveAndroidDefault(d);
+    renderConn();
+    toast('Printer default: '+(d?(d.name||d.address):androidSelectedAddress));
+  };
+  $('btnAndroidRefresh').onclick=refreshAndroidDevices;
+  if(window.AndroidBridge.changeServerUrl){
+    $('btnChangeServer').style.display='';
+    $('btnChangeServer').onclick=()=>{ try{ window.AndroidBridge.changeServerUrl(); }catch(e){} };
+  }
+  if(window.AndroidBridge.openBluetoothSettings){
+    $('btnBtSettings').onclick=()=>{ try{ window.AndroidBridge.openBluetoothSettings(); }catch(e){} };
+  }else{
+    $('btnBtSettings').style.display='none';
+  }
+  refreshAndroidDevices();
+  syncLastJobFromApp();
+  // Dipanggil aplikasi setelah izin Bluetooth diberikan / kembali dari Pengaturan Bluetooth
+  window.sbprintAppResumed=()=>{ refreshAndroidDevices(); syncLastJobFromApp(); renderConn(); };
+  return true;
+}
+const isAndroidApp = initAndroidBridge();
+
+// ---------- Bluetooth (BLE only) — dengan "ingat printer terakhir" ----------
+const BLE_SERVICE_CANDIDATES=[
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // common TI CC254x serial (many cheap BLE printers)
+  '000018f0-0000-1000-8000-00805f9b34fb', // common 18F0 print service
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART
+];
+const LS_BLE_ID='sbprint-ble-device-id';
+const LS_USB_FLAG='sbprint-usb-remembered';
+
+async function findBleWriteChar(server){
+  for(const svcId of BLE_SERVICE_CANDIDATES){
+    try{
+      const svc=await server.getPrimaryService(svcId);
+      const chars=await svc.getCharacteristics();
+      const found=chars.find(c=>c.properties.write || c.properties.writeWithoutResponse);
+      if(found) return found;
+    }catch(e){ /* servis tidak ada di perangkat ini, coba kandidat lain */ }
+  }
+  return null;
+}
+
+let manualDisconnect=false;
+const bleListened=new WeakSet();
+function attachBleAutoReconnect(device){
+  if(bleListened.has(device)) return; // jangan pasang listener dobel
+  bleListened.add(device);
+  device.addEventListener('gattserverdisconnected', async ()=>{
+    if(btDevice!==device) return; // sudah pindah/lupa perangkat, jangan reconnect yang lama
+    btChar=null;
+    if(manualDisconnect){ manualDisconnect=false; setStatus('','Sambungan diputus. Printer tetap diingat.'); return; }
+    try{ navigator.vibrate && navigator.vibrate([200,100,200]); }catch(e){}
+    toast('⚠️ Printer terputus — mencoba menyambung ulang…');
+    bleReconnecting=true;
+    setStatus('err','Printer TERPUTUS — menyambung ulang…');
+    for(let i=0;i<5;i++){
+      await new Promise(r=>setTimeout(r,1500));
+      if(btDevice!==device || btChar) { bleReconnecting=false; renderConn(); return; }
+      try{
+        const server=await device.gatt.connect();
+        const ch=await findBleWriteChar(server);
+        if(ch){
+          btChar=ch; bleReconnecting=false;
+          setStatus('ok','Tersambung lagi (BLE): '+(device.name||'printer'));
+          toast('✅ Printer tersambung lagi');
+          onPrinterReady();
+          return;
+        }
+      }catch(e){ /* coba lagi */ }
+    }
+    bleReconnecting=false;
+    setStatus('err','Printer TERPUTUS — nyalakan printer lalu tekan "Sambungkan Ulang"');
+  });
+}
+
+async function connectBleDevice(device){
+  const server=await device.gatt.connect();
+  const ch=await findBleWriteChar(server);
+  if(!ch) throw new Error('Servis print BLE tidak ditemukan pada perangkat ini (kemungkinan Bluetooth Classic/SPP)');
+  if(usbDevice){ try{ await usbDevice.close(); }catch(e){} }
+  btDevice=device; btChar=ch; usbDevice=null;
+  attachBleAutoReconnect(device);
+  try{
+    localStorage.setItem(LS_BLE_ID, device.id);
+    localStorage.removeItem(LS_USB_FLAG);
+    localStorage.setItem('sbprint-last-printer-name', device.name||'printer Bluetooth');
+  }catch(e){}
+  setStatus('ok','Terhubung (BLE): '+(device.name||'printer'));
+  $('btnForgetPrinter').style.display='block';
+  onPrinterReady();
+}
+
+// Sambungkan ulang ke printer yang diingat (tanpa memilih dari daftar lagi, kalau browser mengizinkan)
+async function reconnectRemembered(){
+  let savedId=null, usbFlag=null;
+  try{ savedId=localStorage.getItem(LS_BLE_ID); usbFlag=localStorage.getItem(LS_USB_FLAG); }catch(e){}
+  if(savedId && navigator.bluetooth){
+    if(btDevice && btDevice.id===savedId){ await connectBleDevice(btDevice); return true; }
+    if(navigator.bluetooth.getDevices){
+      const devices=await navigator.bluetooth.getDevices();
+      const device=devices.find(d=>d.id===savedId);
+      if(device){ await connectBleDevice(device); return true; }
+    }
+    // Browser tidak mengizinkan sambung tanpa memilih — tampilkan daftar perangkat
+    const device=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:BLE_SERVICE_CANDIDATES});
+    await connectBleDevice(device);
+    return true;
+  }
+  if(usbFlag && navigator.usb){
+    const devices=await navigator.usb.getDevices();
+    if(devices.length){ await connectUsbDevice(devices[0]); return true; }
+    const device=await navigator.usb.requestDevice({filters:[]});
+    await connectUsbDevice(device);
+    return true;
+  }
+  return false;
+}
+
+$('btnBt').onclick=async()=>{
+  if(!navigator.bluetooth){
+    toast('Browser ini tidak mendukung Web Bluetooth. Coba Chrome di Android.');
+    return;
+  }
+  try{
+    setStatus('warn','Memilih perangkat…');
+    const device=await navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:BLE_SERVICE_CANDIDATES
+    });
+    setStatus('warn','Menghubungkan…');
+    await connectBleDevice(device);
+    toast('Bluetooth terhubung — lain kali akan otomatis tersambung lagi');
+  }catch(e){
+    setStatus('err','Gagal terhubung');
+    toast('Gagal: '+e.message);
+  }
+};
+
+async function tryAutoReconnectBle(){
+  if(!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+  let savedId=null;
+  try{ savedId=localStorage.getItem(LS_BLE_ID); }catch(e){}
+  if(!savedId) return;
+  try{
+    const devices=await navigator.bluetooth.getDevices();
+    const device=devices.find(d=>d.id===savedId);
+    if(!device) return;
+    setStatus('warn','Menyambungkan otomatis ke printer terakhir…');
+    await connectBleDevice(device);
+    toast('Tersambung otomatis ke printer terakhir');
+  }catch(e){
+    setStatus('err','Printer belum tersambung — pastikan printer menyala, lalu tekan "Sambungkan Ulang"');
+  }
+}
+
+async function sendViaBle(bytes){
+  const CHUNK=180;
+  for(let i=0;i<bytes.length;i+=CHUNK){
+    const chunk=bytes.slice(i,i+CHUNK);
+    if(btChar.properties.writeWithoutResponse){
+      await btChar.writeValueWithoutResponse(chunk);
+      await new Promise(r=>setTimeout(r,15)); // beri jeda kecil supaya buffer printer murah tidak kebanjiran
+    }else{
+      await btChar.writeValue(chunk);
+    }
+  }
+}
+
+// ---------- USB — dengan "ingat printer terakhir" ----------
+async function findUsbOutEndpoint(device){
+  let iface=null, ep=null;
+  for(const conf of device.configurations){
+    for(const int of conf.interfaces){
+      for(const alt of int.alternates){
+        const out=alt.endpoints.find(e=>e.direction==='out');
+        if(out){ iface=int.interfaceNumber; ep=out.endpointNumber; break; }
+      }
+      if(iface!==null) break;
+    }
+    if(iface!==null) break;
+  }
+  return {iface, ep};
+}
+
+async function connectUsbDevice(device){
+  await device.open();
+  if(device.configuration===null) await device.selectConfiguration(1);
+  const {iface, ep}=await findUsbOutEndpoint(device);
+  if(iface===null) throw new Error('Endpoint OUT tidak ditemukan pada perangkat ini');
+  await device.claimInterface(iface);
+  const oldBt=btDevice;
+  usbDevice=device; usbIface=iface; usbEndpoint=ep; btDevice=null; btChar=null;
+  if(oldBt){ try{ oldBt.gatt.disconnect(); }catch(e){} }
+  try{
+    localStorage.setItem(LS_USB_FLAG,'1');
+    localStorage.removeItem(LS_BLE_ID);
+    localStorage.setItem('sbprint-last-printer-name', device.productName||'printer USB');
+  }catch(e){}
+  setStatus('ok','Terhubung (USB): '+(device.productName||'printer'));
+  $('btnForgetPrinter').style.display='block';
+  onPrinterReady();
+}
+if(navigator.usb){
+  navigator.usb.addEventListener('disconnect', e=>{
+    if(usbDevice && e.device===usbDevice){
+      usbDevice=null;
+      try{ navigator.vibrate && navigator.vibrate([200,100,200]); }catch(err){}
+      toast('⚠️ Kabel printer USB terlepas');
+      setStatus('err','Printer USB TERPUTUS — colok lagi kabelnya');
+    }
+  });
+  navigator.usb.addEventListener('connect', e=>{
+    if(!usbDevice && hasRememberedPrinter()){
+      connectUsbDevice(e.device).then(()=>toast('✅ Printer USB tersambung lagi')).catch(()=>{});
+    }
+  });
+}
+
+$('btnUsb').onclick=async()=>{
+  if(!navigator.usb){
+    toast('Browser ini tidak mendukung WebUSB. Coba Chrome di desktop/Android.');
+    return;
+  }
+  try{
+    setStatus('warn','Memilih perangkat USB…');
+    const device=await navigator.usb.requestDevice({filters:[]});
+    setStatus('warn','Menghubungkan…');
+    await connectUsbDevice(device);
+    toast('USB terhubung — lain kali akan otomatis tersambung lagi');
+  }catch(e){
+    setStatus('err','Gagal terhubung');
+    toast('Gagal: '+e.message);
+  }
+};
+async function sendViaUsb(bytes){
+  await usbDevice.transferOut(usbEndpoint, bytes);
+}
+
+async function tryAutoReconnectUsb(){
+  if(!navigator.usb) return;
+  let remembered=null;
+  try{ remembered=localStorage.getItem(LS_USB_FLAG); }catch(e){}
+  if(!remembered) return;
+  try{
+    const devices=await navigator.usb.getDevices();
+    if(devices.length===0) return;
+    setStatus('warn','Menyambungkan otomatis ke printer USB terakhir…');
+    await connectUsbDevice(devices[0]);
+    toast('Tersambung otomatis ke printer USB terakhir');
+  }catch(e){
+    setStatus('err','Printer USB belum tersambung — colok kabel, lalu tekan "Sambungkan Ulang"');
+  }
+}
+
+// ---------- Lupakan printer (reset koneksi tersimpan) ----------
+$('btnForgetPrinter').onclick=async()=>{
+  const oldBt=btDevice;
+  btDevice=null; // lepas dulu supaya listener tidak mencoba menyambung ulang
+  try{ if(oldBt && oldBt.gatt && oldBt.gatt.connected) oldBt.gatt.disconnect(); }catch(e){}
+  try{ if(usbDevice) await usbDevice.close(); }catch(e){}
+  btDevice=null; btChar=null; usbDevice=null; usbIface=null; usbEndpoint=null;
+  try{ localStorage.removeItem(LS_BLE_ID); localStorage.removeItem(LS_USB_FLAG); localStorage.removeItem('sbprint-last-printer-name'); }catch(e){}
+  setStatus('','Belum terhubung');
+  $('btnForgetPrinter').style.display='none';
+  toast('Printer dilupakan. Sambungkan printer (baru atau sama) kapan saja.');
+};
+
+// ---------- Putuskan (printer tetap diingat) & Sambungkan Ulang ----------
+$('btnDisconnect').onclick=async()=>{
+  if(btDevice && btDevice.gatt && btDevice.gatt.connected){
+    manualDisconnect=true;
+    try{ btDevice.gatt.disconnect(); }catch(e){}
+    btChar=null;
+  }
+  if(usbDevice){ try{ await usbDevice.close(); }catch(e){} usbDevice=null; }
+  setStatus('','Sambungan diputus. Printer tetap diingat.');
+  toast('Sambungan printer diputus');
+};
+$('btnReconnect').onclick=async()=>{
+  try{
+    setStatus('warn','Menyambungkan ulang…');
+    const ok=await reconnectRemembered();
+    if(!ok) setStatus('','Belum terhubung');
+  }catch(e){
+    setStatus('err','Gagal menyambung — pastikan printer menyala & dekat HP');
+    toast('Gagal: '+e.message);
+  }
+};
+
+// ---------- Kirim byte ke printer (dipakai oleh Cetak, Test Print, Cetak Ulang, Buka Laci) ----------
+async function sendBytesToPrinter(bytes){
+  if(isAndroidApp){
+    if(!androidSelectedAddress) return {ok:false, error:'Pilih printer dulu dari daftar'};
+    try{
+      const result=window.AndroidBridge.printBase64(bytesToBase64(bytes), androidSelectedAddress);
+      return result==='ok' ? {ok:true} : {ok:false, error:result||'Gagal mengirim ke printer'};
+    }catch(e){ return {ok:false, error:'Gagal cetak: '+e.message}; }
+  }
+  try{
+    if(btChar){ await sendViaBle(bytes); }
+    else if(usbDevice){ await sendViaUsb(bytes); }
+    else{ return {ok:false, error:'Belum ada printer terhubung. Pilih Bluetooth atau USB dulu.'}; }
+    return {ok:true};
+  }catch(e){ return {ok:false, error:'Gagal cetak: '+e.message}; }
+}
+
+function saveLastJob(bytes){
+  try{ localStorage.setItem('sbprint-last-job', bytesToBase64(bytes)); }catch(e){}
+}
+
+// ---------- Print ----------
+async function printCurrent(){
+  const width=parseInt($('paperWidth').value,10);
+  const header=getHeader();
+  const body=$('receiptText').value.trim();
+  const qr=$('fQrCode').value.trim();
+  const barcode=$('fBarcode').value.trim();
+  if(!body && !qr && !barcode && !(header.company||header.address||header.phone)){ toast('Isi struk masih kosong'); return false; }
+  setStatus('warn','Menyiapkan struk…');
+  const bytes=await buildFullReceipt(header, body, width, qr, barcode);
+  setStatus('warn','Mengirim ke printer…');
+  const res=await sendBytesToPrinter(bytes);
+  if(res.ok){
+    setStatus('ok','Struk terkirim ✓ — '+connectedName());
+    toast('Berhasil dikirim ke printer');
+    saveLastJob(bytes);
+    $('btnReprint').style.display='block';
+    return true;
+  }
+  setStatus('err','Gagal mengirim');
+  toast(res.error);
+  return false;
+}
+$('btnPrint').onclick=async()=>{
+  const ok=await printCurrent();
+  if(ok && job.pending){ job.pending=false; job.done=true; updateJobBanner(); }
+};
+
+// ---------- Struk masuk dari SB Sejahtera (URL) ----------
+// job.pending: ada struk yang belum dicetak; job.auto: cetak otomatis begitu printer siap
+// job.raw: byte ESC/POS siap cetak dari SB Sejahtera (SAMA dengan yang dikirim ke RawBT) — dicetak apa adanya
+const job={incoming:false, pending:false, auto:false, done:false, printing:false, returnUrl:'', raw:null, source:null, origin:''};
+
+// Cetak byte mentah apa adanya — persis cara kerja RawBT
+async function printRaw(bytes){
+  setStatus('warn','Mengirim ke printer…');
+  const res=await sendBytesToPrinter(bytes);
+  if(res.ok){
+    setStatus('ok','Struk terkirim ✓ — '+connectedName());
+    toast('✅ Struk tercetak');
+    saveLastJob(bytes);
+    $('btnReprint').style.display='block';
+    return true;
+  }
+  setStatus('err','Gagal mengirim');
+  toast(res.error);
+  return false;
+}
+// Tampilkan isi struk (tanpa kode printer) untuk pratinjau
+function rawToText(bytes){
+  let out='', i=0;
+  while(i<bytes.length){
+    const b=bytes[i];
+    if(b===0x1B){ // ESC x [n]
+      const c=bytes[i+1];
+      i += (c===0x40) ? 2 : 3; continue;
+    }
+    if(b===0x1D){ // GS x n  (GS V m [n])
+      const c=bytes[i+1];
+      i += (c===0x56 && (bytes[i+2]===0x41||bytes[i+2]===0x42||bytes[i+2]===65||bytes[i+2]===66)) ? 4 : 3; continue;
+    }
+    if(b===0x0A){ out+='\n'; i++; continue; }
+    if(b>=0x20 && b<0x7F) out+=String.fromCharCode(b);
+    i++;
+  }
+  return out;
+}
+function setRawJob(bytes, opts){
+  opts=opts||{};
+  job.raw=bytes; job.incoming=true; job.pending=true; job.done=false; job.auto=true; // RawBT selalu langsung cetak
+  job.source=opts.source||null; job.origin=opts.origin||'';
+  $('jobPreview').textContent=rawToText(bytes);
+  $('jobPreviewWrap').style.display='';
+  window.scrollTo({top:0});
+  updateJobBanner();
+  if(isConnected()) runPendingJob();
+}
+function replyToSource(ok){
+  try{ if(job.source && job.origin) job.source.postMessage({type:'sbprint-result', ok:ok}, job.origin); }catch(e){}
+}
+
+async function runPendingJob(){
+  if(!job.pending || job.printing || !isConnected()) return;
+  job.printing=true; updateJobBanner();
+  const ok = job.raw ? await printRaw(job.raw) : await printCurrent();
+  job.printing=false;
+  if(ok){ job.pending=false; job.done=true; }
+  replyToSource(ok);
+  updateJobBanner();
+}
+
+// Terima struk dari tab SB Sejahtera yang sudah membuka SB Print sebelumnya (tanpa memuat ulang halaman,
+// jadi sambungan Bluetooth tidak putus — sama seperti RawBT yang tetap siaga di latar belakang).
+const ALLOWED_ORIGIN=/^https:\/\/([a-z0-9-]+\.)*(sbsejahtera\.my\.id|sbsqu\.com)$/i;
+window.addEventListener('message', e=>{
+  const d=e.data;
+  if(!d || typeof d!=='object') return;
+  if(!ALLOWED_ORIGIN.test(e.origin)) return;
+  if(d.type==='sbprint-ping'){ try{ e.source.postMessage({type:'sbprint-pong'}, e.origin); }catch(err){} return; }
+  if(d.type!=='sbprint-raw' || typeof d.raw!=='string') return;
+  try{
+    const bytes=Uint8Array.from(atob(d.raw), c=>c.charCodeAt(0));
+    try{ e.source.postMessage({type:'sbprint-ack'}, e.origin); }catch(err){}
+    toast('🧾 Struk baru dari SB Sejahtera');
+    setRawJob(bytes, {source:e.source, origin:e.origin});
+  }catch(err){ toast('Data struk tidak valid'); }
+});
+// Dipanggil setiap kali printer berhasil tersambung
+function onPrinterReady(){
+  if(job.pending && job.auto) setTimeout(runPendingJob, 300);
+}
+function updateJobBanner(){
+  const b=$('jobBanner');
+  if(!b) return;
+  if(!job.incoming){ b.classList.remove('show'); return; }
+  b.classList.add('show');
+  const conn=isConnected();
+  if(job.printing){
+    $('jobTitle').textContent='🖨️ Sedang mencetak struk…';
+    $('jobNote').textContent='Tunggu sebentar, jangan tutup halaman ini.';
+    $('btnJobConnect').style.display='none';
+    $('btnJobPrint').style.display='none';
+  }else if(job.done){
+    $('jobTitle').textContent='✅ Struk sudah tercetak';
+    $('jobNote').textContent='Kalau hasilnya kurang jelas, tekan Cetak Lagi.';
+    $('btnJobConnect').style.display='none';
+    $('btnJobPrint').style.display='';
+    $('btnJobPrint').textContent='🔁 Cetak Lagi';
+  }else if(conn){
+    $('jobTitle').textContent='🧾 Struk dari SB Sejahtera siap dicetak';
+    $('jobNote').textContent = job.auto ? 'Printer tersambung — struk dicetak otomatis.' : 'Printer tersambung. Tekan Cetak Sekarang.';
+    $('btnJobConnect').style.display='none';
+    $('btnJobPrint').style.display='';
+    $('btnJobPrint').textContent='🖨️ Cetak Sekarang';
+  }else{
+    $('jobTitle').textContent='🧾 Struk dari SB Sejahtera menunggu printer';
+    $('jobNote').textContent = bleReconnecting
+      ? 'Printer sedang disambungkan ulang…'
+      : 'Printer belum tersambung. Nyalakan printer, lalu tekan tombol di bawah — struk langsung tercetak.';
+    $('btnJobConnect').style.display='';
+    $('btnJobConnect').textContent = hasRememberedPrinter()
+      ? '🔌 Sambungkan ke '+(lastPrinterName()||'printer terakhir')+' & Cetak'
+      : '🔌 Pilih Printer & Cetak';
+    $('btnJobPrint').style.display='none';
+  }
+}
+$('btnJobConnect').onclick=async()=>{
+  job.auto=true; // pengguna sudah menekan "…& Cetak"
+  try{
+    setStatus('warn','Menyambungkan…');
+    let ok=false;
+    if(hasRememberedPrinter()) ok=await reconnectRemembered();
+    else if(navigator.bluetooth){
+      const device=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:BLE_SERVICE_CANDIDATES});
+      await connectBleDevice(device); ok=true;
+    }else if(navigator.usb){
+      const device=await navigator.usb.requestDevice({filters:[]});
+      await connectUsbDevice(device); ok=true;
+    }else{
+      toast('Browser ini tidak mendukung Bluetooth/USB. Pakai Chrome di Android.');
+    }
+    if(ok) runPendingJob();
+    else setStatus('','Belum terhubung');
+  }catch(e){
+    setStatus('err','Gagal menyambung — pastikan printer menyala & dekat HP');
+    toast('Gagal: '+e.message);
+  }
+};
+$('btnJobPrint').onclick=()=>{ job.pending=true; job.done=false; runPendingJob(); };
+$('btnJobBack').onclick=()=>{
+  if(job.returnUrl){ location.href=job.returnUrl; return; }
+  // Kalau browser tidak bisa menyambung otomatis, JANGAN tutup tab ini: biarkan terbuka di belakang
+  // supaya struk berikutnya langsung tercetak tanpa menyambung ulang.
+  const bisaAutoSambung = !!(navigator.bluetooth && navigator.bluetooth.getDevices);
+  if(window.opener && !bisaAutoSambung){
+    try{ window.opener.focus(); }catch(e){}
+    toast('Buka lagi SB Sejahtera lewat tombol ▢ (aplikasi terbaru) — biarkan tab SB Print ini tetap terbuka supaya printer tetap tersambung', 5000);
+    return;
+  }
+  try{ window.close(); }catch(e){}
+  setTimeout(()=>{
+    if(history.length>1) history.back();
+    else toast('Silakan kembali ke aplikasi SB Sejahtera (tombol kembali HP)');
+  }, 250);
+};
+
+// ---------- Test Print ----------
+$('btnTestPrint').onclick=async()=>{
+  const width=parseInt($('paperWidth').value,10);
+  setStatus('warn','Mengirim test print…');
+  const bytes=buildEscPos(
+    {company:'TEST PRINT', address:'SB Print', phone:new Date().toLocaleString('id-ID')},
+    'Kalau baris ini tercetak dengan\nrapi, printer sudah siap dipakai.\n--------------------------------\nTerima kasih!',
+    width
+  );
+  const res=await sendBytesToPrinter(bytes);
+  if(res.ok){ setStatus('ok','Test print terkirim ✓'); toast('Test print berhasil'); }
+  else{ setStatus('err','Gagal'); toast(res.error); }
+};
+
+// ---------- Cetak Ulang Terakhir ----------
+$('btnReprint').onclick=async()=>{
+  let b64=null;
+  try{ b64=localStorage.getItem('sbprint-last-job'); }catch(e){}
+  if(!b64){ toast('Belum ada struk yang pernah dicetak di HP ini'); return; }
+  const bytes=Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+  setStatus('warn','Mengirim ulang struk terakhir…');
+  const res=await sendBytesToPrinter(bytes);
+  if(res.ok){ setStatus('ok','Struk terakhir terkirim ulang ✓'); toast('Berhasil cetak ulang'); }
+  else{ setStatus('err','Gagal'); toast(res.error); }
+};
+
+// ---------- Buka Laci Kas ----------
+$('btnCashDrawer').onclick=async()=>{
+  const bytes=new Uint8Array([0x1B,0x70,0x00,0x19,0xFA]); // ESC p 0 25 250 - kick standar RJ11
+  setStatus('warn','Membuka laci kas…');
+  const res=await sendBytesToPrinter(bytes);
+  if(res.ok){ setStatus('ok','Perintah terkirim ✓'); toast('Laci kas seharusnya terbuka'); }
+  else{ setStatus('err','Gagal'); toast(res.error); }
+};
+
+// ---------- Mode: aplikasi terpasang vs browser ----------
+const isStandalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone===true;
+function initModeUi(){
+  if(!isAndroidApp && navigator.bluetooth && !navigator.bluetooth.getDevices) $('flagHint').style.display='block';
+  $('modeBadge').textContent = isAndroidApp ? 'Mode: Aplikasi Android' : isStandalone ? 'Mode: Aplikasi' : 'Mode: Browser';
+  if(isAndroidApp || isStandalone) return;
+  let stay=false;
+  try{ stay=localStorage.getItem('sbprint-stay-browser')==='1'; }catch(e){}
+  if(stay || !navigator.getInstalledRelatedApps) return;
+  navigator.getInstalledRelatedApps().then(apps=>{
+    if(apps && apps.length) $('openAppCard').style.display='block';
+  }).catch(()=>{});
+}
+$('btnOpenApp').onclick=()=>{
+  // Android: minta sistem membuka alamat ini — kalau aplikasi SB Print terpasang, ia yang akan menangani
+  const path=location.pathname+location.search;
+  location.href='intent://'+location.host+path+'#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+};
+$('btnStayBrowser').onclick=()=>{
+  try{ localStorage.setItem('sbprint-stay-browser','1'); }catch(e){}
+  $('openAppCard').style.display='none';
+  toast('OK, tetap cetak dari browser');
+};
+
+// ---------- PWA install ----------
+let deferredInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  if(isAndroidApp) return;
+  e.preventDefault();
+  deferredInstallPrompt=e;
+  $('installCard').style.display='block';
+});
+$('btnInstall').onclick=async()=>{
+  if(!deferredInstallPrompt){ toast('Aplikasi sudah terpasang atau instal tidak tersedia di browser ini'); return; }
+  deferredInstallPrompt.prompt();
+  const choice=await deferredInstallPrompt.userChoice;
+  if(choice.outcome==='accepted') toast('Aplikasi sedang dipasang…');
+  deferredInstallPrompt=null;
+  $('installCard').style.display='none';
+};
+window.addEventListener('appinstalled',()=>{
+  toast('SB Print terpasang ✓');
+  $('installCard').style.display='none';
+});
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/print/sw.js',{scope:'/print/'}).then(r=>r.update()).catch(()=>{});
+  });
+}
+
+// ---------- URL param integration ----------
+function b64ToUtf8(b64){
+  return decodeURIComponent(escape(atob(b64)));
+}
+(async function initFromQuery(){
+  initSettingsUi();
+  connReady=true;
+  initConnUi();
+  initDefault();
+  initModeUi();
+  renderConn();
+
+  const p=new URLSearchParams(location.search);
+  const w=p.get('width');
+  if(w && (w==='32'||w==='48')) $('paperWidth').value=w;
+
+  const data=p.get('data');
+  if(data){
+    try{
+      $('receiptText').value=b64ToUtf8(data);
+      toast('Data struk dimuat dari URL');
+    }catch(e){ toast('Parameter data tidak valid (harus Base64)'); }
+  }
+  const company=p.get('company');
+  const address=p.get('address');
+  const phone=p.get('phone');
+  const qrParam=p.get('qr');
+  const barcodeParam=p.get('barcode');
+  try{
+    if(company!==null) $('fCompany').value=b64ToUtf8(company);
+    if(address!==null) $('fAddress').value=b64ToUtf8(address);
+    if(phone!==null) $('fPhone').value=b64ToUtf8(phone);
+    if(qrParam!==null) $('fQrCode').value=b64ToUtf8(qrParam);
+    if(barcodeParam!==null) $('fBarcode').value=b64ToUtf8(barcodeParam);
+  }catch(e){ /* abaikan param yang tidak valid */ }
+
+  const retParam=p.get('return');
+  if(retParam && /^https?:\/\//i.test(retParam)) job.returnUrl=retParam;
+
+  // Ada struk masuk dari SB Sejahtera?
+  const rawParam=p.get('raw');
+  if(rawParam){
+    try{ setRawJob(Uint8Array.from(atob(rawParam), c=>c.charCodeAt(0))); }
+    catch(e){ toast('Data struk tidak valid'); }
+  }else if(data!==null || qrParam!==null || barcodeParam!==null){
+    job.incoming=true;
+    job.pending=true;
+    job.auto = p.get('autoprint')==='1' || isDefault();
+    updateJobBanner();
+  }
+
+  // Sambungkan otomatis ke printer terakhir, lalu cetak kalau ada struk menunggu
+  if(isAndroidApp){
+    onPrinterReady();
+  }else{
+    if(hasRememberedPrinter()) $('btnForgetPrinter').style.display='block';
+    await tryAutoReconnectBle();
+    if(!isConnected()) await tryAutoReconnectUsb();
+    if(!isConnected() && hasRememberedPrinter()){
+      setStatus('err','Printer TERPUTUS — nyalakan printer lalu tekan "Sambungkan Ulang"');
+    }
+  }
+  renderConn();
+})();
+</script>
+</body>
+</html>

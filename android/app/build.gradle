@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNo = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+android {
+    namespace 'id.sbsqu.sbprint'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'id.sbsqu.sbprint'
+        minSdk 23
+        targetSdk 34
+        versionCode runNo
+        versionName "1.0." + runNo
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('sbprint.jks')
+            storePassword 'sbprint2026'
+            keyAlias 'sbprint'
+            keyPassword 'sbprint2026'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
