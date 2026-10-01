@@ -1,0 +1,689 @@
+# SB Print — aplikasi Android pendamping SB Sejahtera (cara kerja seperti RawBT).
+# File ini SATU-SATUNYA yang perlu ada di repo: GitHub akan menyusun kode aplikasi,
+# membangun APK, lalu menaruhnya di halaman "Releases" repo ini.
+# Link unduh tetap (selalu versi terbaru):
+#   https://github.com/<akun>/<repo>/releases/latest/download/SBPrint.apk
+name: Build SB Print APK
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Siapkan kode aplikasi
+        run: |
+          rm -rf sbprint-android
+          mkdir -p sbprint-android/app/src/main/java/id/sbsqu/sbprint sbprint-android/app/src/main/res/mipmap-xxxhdpi
+          cd sbprint-android
+          cat > settings.gradle <<'SBP_EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "SBPrint"
+          include ':app'
+          SBP_EOF
+          cat > build.gradle <<'SBP_EOF'
+          plugins {
+              id 'com.android.application' version '8.5.2' apply false
+          }
+          SBP_EOF
+          cat > gradle.properties <<'SBP_EOF'
+          org.gradle.jvmargs=-Xmx2g
+          android.useAndroidX=false
+          SBP_EOF
+          cat > app/build.gradle <<'SBP_EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          def runNo = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+          android {
+              namespace 'id.sbsqu.sbprint'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId 'id.sbsqu.sbprint'
+                  minSdk 23
+                  targetSdk 34
+                  versionCode runNo
+                  versionName "1.0." + runNo
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file('sbprint.jks')
+                      storePassword 'sbprint2026'
+                      keyAlias 'sbprint'
+                      keyPassword 'sbprint2026'
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                      signingConfig signingConfigs.release
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          SBP_EOF
+          cat > app/src/main/AndroidManifest.xml <<'SBP_EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="SB Print">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@android:style/Theme.Material.Light.DarkActionBar">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <activity
+                      android:name=".PrintActivity"
+                      android:exported="true"
+                      android:excludeFromRecents="true"
+                      android:noHistory="true"
+                      android:taskAffinity=""
+                      android:theme="@android:style/Theme.Translucent.NoTitleBar">
+                      <intent-filter>
+                          <action android:name="android.intent.action.VIEW" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <category android:name="android.intent.category.BROWSABLE" />
+                          <data android:scheme="sbprint" />
+                      </intent-filter>
+                      <intent-filter>
+                          <action android:name="android.intent.action.SEND" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <data android:mimeType="text/plain" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          SBP_EOF
+          cat > app/src/main/java/id/sbsqu/sbprint/Printer.java <<'SBP_EOF'
+          package id.sbsqu.sbprint;
+
+          import android.bluetooth.BluetoothAdapter;
+          import android.bluetooth.BluetoothDevice;
+          import android.bluetooth.BluetoothSocket;
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import android.content.pm.PackageManager;
+          import android.os.Build;
+
+          import java.io.IOException;
+          import java.io.OutputStream;
+          import java.lang.reflect.Method;
+          import java.util.UUID;
+
+          /**
+           * Pengiriman byte ESC/POS ke printer thermal lewat Bluetooth Classic (SPP) —
+           * cara yang sama dengan RawBT. Sambungan disimpan selama aplikasi hidup supaya
+           * cetakan berikutnya langsung jalan tanpa menyambung ulang.
+           */
+          public final class Printer {
+              private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+              private static final String PREFS = "sbprint";
+              public static final String PERM_CONNECT = "android.permission.BLUETOOTH_CONNECT";
+
+              private static BluetoothSocket socket;
+              private static String socketAddress;
+
+              private Printer() {}
+
+              public static SharedPreferences prefs(Context c) {
+                  return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+              }
+              public static String address(Context c) { return prefs(c).getString("address", null); }
+              public static String name(Context c) { return prefs(c).getString("name", null); }
+              public static int width(Context c) { return prefs(c).getInt("width", 32); }
+
+              public static void save(Context c, String address, String name) {
+                  prefs(c).edit().putString("address", address).putString("name", name).apply();
+                  close();
+              }
+              public static void setWidth(Context c, int w) { prefs(c).edit().putInt("width", w).apply(); }
+
+              public static boolean hasPermission(Context c) {
+                  if (Build.VERSION.SDK_INT < 31) return true;
+                  return c.checkSelfPermission(PERM_CONNECT) == PackageManager.PERMISSION_GRANTED;
+              }
+
+              public static boolean isReady(Context c) {
+                  return hasPermission(c) && address(c) != null;
+              }
+
+              /** Kirim byte ke printer default. Dipanggil dari thread latar belakang. */
+              public static synchronized void send(Context c, byte[] data) throws IOException {
+                  String addr = address(c);
+                  if (addr == null) throw new IOException("Printer default belum dipilih");
+                  BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+                  if (adapter == null) throw new IOException("HP ini tidak punya Bluetooth");
+                  if (!adapter.isEnabled()) throw new IOException("Bluetooth HP masih mati — nyalakan dulu");
+
+                  try {
+                      writeAll(ensureSocket(adapter, addr), data);
+                  } catch (IOException first) {
+                      // Sambungan lama mungkin sudah putus (printer dimatikan) — sambung ulang sekali
+                      close();
+                      writeAll(ensureSocket(adapter, addr), data);
+                  }
+              }
+
+              private static BluetoothSocket ensureSocket(BluetoothAdapter adapter, String addr) throws IOException {
+                  if (socket != null && socket.isConnected() && addr.equals(socketAddress)) return socket;
+                  close();
+                  BluetoothDevice device = adapter.getRemoteDevice(addr);
+                  try { adapter.cancelDiscovery(); } catch (SecurityException ignored) { }
+
+                  IOException last = null;
+                  // 1) cara standar  2) tanpa enkripsi (banyak printer Cina)  3) kanal 1 langsung
+                  for (int attempt = 0; attempt < 3; attempt++) {
+                      BluetoothSocket s = null;
+                      try {
+                          if (attempt == 0) s = device.createRfcommSocketToServiceRecord(SPP);
+                          else if (attempt == 1) s = device.createInsecureRfcommSocketToServiceRecord(SPP);
+                          else {
+                              Method m = device.getClass().getMethod("createRfcommSocket", int.class);
+                              s = (BluetoothSocket) m.invoke(device, 1);
+                          }
+                          s.connect();
+                          socket = s;
+                          socketAddress = addr;
+                          return s;
+                      } catch (IOException e) {
+                          last = e;
+                          try { if (s != null) s.close(); } catch (IOException ignored) { }
+                      } catch (Exception e) {
+                          last = new IOException(e.getMessage() == null ? e.toString() : e.getMessage());
+                          try { if (s != null) s.close(); } catch (IOException ignored) { }
+                      }
+                  }
+                  throw new IOException("Printer tidak tersambung. Pastikan printer menyala dan dekat HP. ("
+                          + (last == null ? "-" : last.getMessage()) + ")");
+              }
+
+              private static void writeAll(BluetoothSocket s, byte[] data) throws IOException {
+                  OutputStream out = s.getOutputStream();
+                  final int chunk = 512;
+                  for (int i = 0; i < data.length; i += chunk) {
+                      out.write(data, i, Math.min(chunk, data.length - i));
+                      out.flush();
+                      try { Thread.sleep(20); } catch (InterruptedException ignored) { }
+                  }
+                  // beri waktu printer menerima sisa data sebelum pekerjaan dianggap selesai
+                  try { Thread.sleep(Math.min(1500, 200 + data.length / 20)); } catch (InterruptedException ignored) { }
+              }
+
+              public static synchronized void close() {
+                  try { if (socket != null) socket.close(); } catch (IOException ignored) { }
+                  socket = null;
+                  socketAddress = null;
+              }
+
+              /** Struk uji coba — dicetak dari layar utama aplikasi. */
+              public static byte[] testReceipt(int width) {
+                  StringBuilder dash = new StringBuilder();
+                  for (int i = 0; i < width; i++) dash.append('-');
+                  String now = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.US)
+                          .format(new java.util.Date());
+                  java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+                  byte[][] parts = {
+                      {0x1B, 0x40}, {0x1B, 0x61, 0x01}, {0x1B, 0x45, 0x01}, {0x1D, 0x21, 0x11},
+                      "SB PRINT\n".getBytes(), {0x1D, 0x21, 0x00}, {0x1B, 0x45, 0x00},
+                      "Test Print\n".getBytes(), (now + "\n").getBytes(), {0x1B, 0x61, 0x00},
+                      (dash + "\n").getBytes(),
+                      "Kalau tulisan ini rapi, printer\nsiap dipakai dari SB Sejahtera.\n".getBytes(),
+                      (dash + "\n\n\n\n").getBytes(), {0x1D, 0x56, 0x01}
+                  };
+                  for (byte[] p : parts) b.write(p, 0, p.length);
+                  return b.toByteArray();
+              }
+          }
+          SBP_EOF
+          cat > app/src/main/java/id/sbsqu/sbprint/PrintActivity.java <<'SBP_EOF'
+          package id.sbsqu.sbprint;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.util.Base64;
+          import android.widget.Toast;
+
+          /**
+           * Penerima cetak tanpa tampilan — dipanggil dari SB Sejahtera lewat alamat
+           * "sbprint:base64,...." (format sama dengan "rawbt:base64,...."). Mencetak ke
+           * printer default lalu langsung menutup diri, sehingga pengguna tetap di SB Sejahtera.
+           */
+          public class PrintActivity extends Activity {
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  final byte[] data = readJob(getIntent());
+                  if (data == null || data.length == 0) {
+                      Toast.makeText(this, "SB Print: data struk kosong / tidak dikenali", Toast.LENGTH_LONG).show();
+                      finish();
+                      return;
+                  }
+                  if (!Printer.isReady(this)) {
+                      // Belum ada izin / printer default — buka layar utama, struk dicetak setelah printer dipilih
+                      Intent i = new Intent(this, MainActivity.class);
+                      i.putExtra(MainActivity.EXTRA_PENDING, data);
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                      startActivity(i);
+                      finish();
+                      return;
+                  }
+                  Toast.makeText(this, "🖨️ SB Print: mencetak…", Toast.LENGTH_SHORT).show();
+                  new Thread(() -> {
+                      String err = null;
+                      try { Printer.send(getApplicationContext(), data); }
+                      catch (Exception e) { err = e.getMessage(); }
+                      final String msg = err == null ? "✅ Struk tercetak" : "⚠️ Gagal cetak: " + err;
+                      final boolean failed = err != null;
+                      runOnUiThread(() -> {
+                          Toast.makeText(getApplicationContext(), msg, failed ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
+                          finish();
+                      });
+                  }).start();
+              }
+
+              /** Terima: sbprint:base64,XXXX  |  sbprint:XXXX (teks biasa)  |  bagikan teks (ACTION_SEND) */
+              static byte[] readJob(Intent intent) {
+                  if (intent == null) return null;
+                  try {
+                      if (Intent.ACTION_SEND.equals(intent.getAction())) {
+                          String t = intent.getStringExtra(Intent.EXTRA_TEXT);
+                          return t == null ? null : (t + "\n\n\n").getBytes("ISO-8859-1");
+                      }
+                      String s = intent.getDataString();
+                      if (s == null) return null;
+                      int colon = s.indexOf(':');
+                      String body = colon >= 0 ? s.substring(colon + 1) : s;
+                      if (body.startsWith("//")) body = body.substring(2);
+                      if (body.contains("%")) body = Uri.decode(body);
+                      if (body.startsWith("base64,")) {
+                          String b64 = body.substring(7).replace(' ', '+').trim();
+                          return Base64.decode(b64, Base64.DEFAULT);
+                      }
+                      return body.getBytes("ISO-8859-1");
+                  } catch (Exception e) {
+                      return null;
+                  }
+              }
+          }
+          SBP_EOF
+          cat > app/src/main/java/id/sbsqu/sbprint/MainActivity.java <<'SBP_EOF'
+          package id.sbsqu.sbprint;
+
+          import android.app.Activity;
+          import android.app.AlertDialog;
+          import android.bluetooth.BluetoothAdapter;
+          import android.bluetooth.BluetoothDevice;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.provider.Settings;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.Set;
+
+          /** Layar pengaturan: pilih printer default, lebar kertas, test print. */
+          public class MainActivity extends Activity {
+              public static final String EXTRA_PENDING = "pending";
+              private static final int REQ_PERM = 7;
+              private static final int GREEN = Color.parseColor("#0F7A5C");
+
+              private TextView status;
+              private Button btn58, btn80;
+              private byte[] pending;
+              private Runnable afterPermission;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  pending = getIntent().getByteArrayExtra(EXTRA_PENDING);
+                  buildUi();
+                  refresh();
+                  if (pending != null) {
+                      Toast.makeText(this, "Pilih printer dulu — struk langsung dicetak setelahnya", Toast.LENGTH_LONG).show();
+                      withPermission(this::choosePrinter);
+                  }
+              }
+
+              @Override
+              protected void onNewIntent(Intent intent) {
+                  super.onNewIntent(intent);
+                  byte[] p = intent.getByteArrayExtra(EXTRA_PENDING);
+                  if (p != null) { pending = p; withPermission(this::choosePrinter); }
+              }
+
+              private void buildUi() {
+                  float d = getResources().getDisplayMetrics().density;
+                  int pad = (int) (18 * d);
+                  ScrollView sv = new ScrollView(this);
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(pad, pad, pad, pad);
+                  sv.addView(root);
+
+                  TextView title = text("🧾 SB Print", 24, true);
+                  root.addView(title);
+                  root.addView(text("Jembatan cetak struk thermal untuk SB Sejahtera — cara kerja seperti RawBT, tanpa tulisan promosi.", 14, false));
+
+                  status = text("", 15, true);
+                  status.setPadding(pad / 2, pad / 2, pad / 2, pad / 2);
+                  GradientDrawable bg = new GradientDrawable();
+                  bg.setCornerRadius(12 * d);
+                  bg.setColor(Color.parseColor("#EEF6F3"));
+                  bg.setStroke((int) (1.5f * d), GREEN);
+                  status.setBackground(bg);
+                  root.addView(status, margins(0, 14));
+
+                  root.addView(button("🔌 Pilih Printer Default", true, v -> withPermission(this::choosePrinter)), margins(0, 12));
+                  root.addView(button("🧪 Test Print", false, v -> withPermission(this::testPrint)), margins(0, 8));
+
+                  root.addView(text("Lebar kertas (untuk Test Print)", 13, false), margins(0, 16));
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  btn58 = button("58mm", false, v -> { Printer.setWidth(this, 32); refresh(); });
+                  btn80 = button("80mm", false, v -> { Printer.setWidth(this, 48); refresh(); });
+                  row.addView(btn58, new LinearLayout.LayoutParams(0, -2, 1));
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+                  lp.leftMargin = (int) (8 * d);
+                  row.addView(btn80, lp);
+                  root.addView(row, margins(0, 4));
+
+                  root.addView(button("⚙️ Buka Pengaturan Bluetooth HP (pairing)", false,
+                          v -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS))), margins(0, 16));
+
+                  root.addView(text("Cara pakai", 16, true), margins(0, 22));
+                  root.addView(text(
+                          "1. Pairing printer sekali lewat Pengaturan Bluetooth HP.\n"
+                        + "2. Tekan \"Pilih Printer Default\" lalu pilih printer thermal Anda.\n"
+                        + "3. Di SB Sejahtera, lembar Cetak Thermal → nyalakan \"Aplikasi Android SB Print sudah terpasang\".\n"
+                        + "4. Tekan \"Cetak via SB Print\" — struk langsung tercetak, Anda tetap di SB Sejahtera.\n\n"
+                        + "Isi dan format struk diatur dari ⚙ Pengaturan Cetak di SB Sejahtera (sama persis seperti RawBT).", 14, false), margins(0, 4));
+
+                  String ver = "";
+                  try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) { }
+                  TextView v = text("Versi " + ver, 12, false);
+                  v.setGravity(Gravity.CENTER);
+                  root.addView(v, margins(0, 24));
+                  setContentView(sv);
+              }
+
+              private void refresh() {
+                  String name = Printer.name(this);
+                  if (!Printer.hasPermission(this)) status.setText("⚠️ Izin Bluetooth belum diberikan — tekan Pilih Printer Default");
+                  else if (name == null) status.setText("⚪ Printer default belum dipilih");
+                  else status.setText("🟢 Printer default: " + name);
+                  int w = Printer.width(this);
+                  style(btn58, w == 32);
+                  style(btn80, w == 48);
+              }
+
+              private void withPermission(Runnable r) {
+                  if (Printer.hasPermission(this)) { r.run(); return; }
+                  afterPermission = r;
+                  requestPermissions(new String[]{Printer.PERM_CONNECT}, REQ_PERM);
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+                  super.onRequestPermissionsResult(requestCode, permissions, results);
+                  refresh();
+                  if (requestCode == REQ_PERM && results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                      if (afterPermission != null) afterPermission.run();
+                  } else {
+                      Toast.makeText(this, "Izin Bluetooth diperlukan untuk mencetak", Toast.LENGTH_LONG).show();
+                  }
+                  afterPermission = null;
+              }
+
+              private void choosePrinter() {
+                  BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+                  if (adapter == null) { toast("HP ini tidak punya Bluetooth"); return; }
+                  if (!adapter.isEnabled()) {
+                      toast("Nyalakan Bluetooth HP dulu");
+                      try { startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)); } catch (Exception ignored) { }
+                      return;
+                  }
+                  Set<BluetoothDevice> bonded;
+                  try { bonded = adapter.getBondedDevices(); } catch (SecurityException e) { toast("Izin Bluetooth ditolak"); return; }
+                  final List<BluetoothDevice> list = new ArrayList<>(bonded);
+                  if (list.isEmpty()) {
+                      new AlertDialog.Builder(this)
+                              .setTitle("Belum ada printer ter-pairing")
+                              .setMessage("Pairing printer thermal dulu lewat Pengaturan Bluetooth HP (PIN biasanya 0000 atau 1234), lalu kembali ke sini.")
+                              .setPositiveButton("Buka Pengaturan Bluetooth", (dl, w) -> startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)))
+                              .setNegativeButton("Tutup", null).show();
+                      return;
+                  }
+                  String[] names = new String[list.size()];
+                  for (int i = 0; i < list.size(); i++) {
+                      String n = null;
+                      try { n = list.get(i).getName(); } catch (SecurityException ignored) { }
+                      names[i] = (n == null ? "(tanpa nama)" : n) + "\n" + list.get(i).getAddress();
+                  }
+                  new AlertDialog.Builder(this)
+                          .setTitle("Pilih printer thermal")
+                          .setItems(names, (dl, which) -> {
+                              BluetoothDevice dev = list.get(which);
+                              String n = null;
+                              try { n = dev.getName(); } catch (SecurityException ignored) { }
+                              Printer.save(this, dev.getAddress(), n == null ? dev.getAddress() : n);
+                              refresh();
+                              toast("Printer default disimpan ✓");
+                              if (pending != null) { byte[] p = pending; pending = null; print(p, true); }
+                          })
+                          .setNegativeButton("Batal", null).show();
+              }
+
+              private void testPrint() {
+                  if (Printer.address(this) == null) { choosePrinter(); return; }
+                  print(Printer.testReceipt(Printer.width(this)), false);
+              }
+
+              private void print(final byte[] data, final boolean closeAfter) {
+                  toast("Mencetak…");
+                  new Thread(() -> {
+                      String err = null;
+                      try { Printer.send(getApplicationContext(), data); } catch (Exception e) { err = e.getMessage(); }
+                      final String e2 = err;
+                      runOnUiThread(() -> {
+                          if (e2 == null) {
+                              toast("✅ Struk tercetak");
+                              if (closeAfter) finish();
+                          } else {
+                              new AlertDialog.Builder(this).setTitle("Gagal mencetak").setMessage(e2)
+                                      .setPositiveButton("OK", null).show();
+                          }
+                      });
+                  }).start();
+              }
+
+              // ---------- bantuan tampilan ----------
+              private TextView text(String s, int sp, boolean bold) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(sp);
+                  t.setTextColor(Color.parseColor("#1A1D23"));
+                  if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+                  t.setLineSpacing(0, 1.15f);
+                  return t;
+              }
+              private Button button(String s, boolean primary, View.OnClickListener l) {
+                  Button b = new Button(this);
+                  b.setText(s);
+                  b.setAllCaps(false);
+                  b.setTextSize(15);
+                  b.setOnClickListener(l);
+                  style(b, primary);
+                  return b;
+              }
+              private void style(Button b, boolean primary) {
+                  float d = getResources().getDisplayMetrics().density;
+                  GradientDrawable g = new GradientDrawable();
+                  g.setCornerRadius(12 * d);
+                  g.setColor(primary ? GREEN : Color.WHITE);
+                  g.setStroke((int) d, primary ? GREEN : Color.parseColor("#C9CDD4"));
+                  b.setBackground(g);
+                  b.setTextColor(primary ? Color.WHITE : Color.parseColor("#1A1D23"));
+                  b.setPadding((int) (12 * d), (int) (12 * d), (int) (12 * d), (int) (12 * d));
+              }
+              private LinearLayout.LayoutParams margins(int l, int topDp) {
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+                  p.topMargin = (int) (topDp * getResources().getDisplayMetrics().density);
+                  return p;
+              }
+              private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
+          }
+          SBP_EOF
+          base64 -d > app/sbprint.jks <<'SBP_EOF'
+          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
+          SBP_EOF
+          base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png <<'SBP_EOF'
+          iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAADcklEQVR4nO3dS07bYBSA0STqnC4Q
+          NgLjshFYYFkBHbWiQF6OH4m/c4ZIJB7cz/d3QMp2s4C7x/v3Jd6X6/b2/Lqd+z1neUMDz1BTRzHZ
+          ixt6xjZFDKO/oMFnamOGMNoLGXzmNkYIF7+AwWdJl0Zw0S8bfq7F0BB2Q9/Q8HNNhs7j2dUYfK7d
+          OdvgrA1g+LkF58zpyQEYfm7JqfN6UgCGn1t0ytweDcDwc8uOze/gT4FgDQ4G4O7PGhya470BGH7W
+          ZN88fxuA4WeNvptrzwCkfQnA3Z81+zzfNgBp/wXg7k/Bxzm3AUj7F4C7PyV/590GIE0ApG03G8cf
+          umwA0gRA2o+lL2Bsv3+9LH0Jq/bz6WHpSxjVzvmfMkcg0gRAmgBIEwBpAiBNAKQJgDQBkCYA0gRA
+          mgBIEwBpAiBNAKQJgDQBkCYA0gRAmgBIEwBpAiBNAKQJgDQBkCYA0gRAmgBIEwBpAiBNAKQJgDQB
+          kCYA0gRAmgBIEwBp27m/JM+3OHLI3N9CaQOQJgDSBECaAEgTAGkCIE0ApAmANAGQJgDSBECaAEgT
+          AGkCIE0ApAmANAGQJgDSBECaAEgTAGkCIE0ApAmANAGQJgDSBECaAEgTAGkCIE0ApAmANAGQJgDS
+          BECaAEgTAGkCIE0ApAmANAGQJgDSBECaAEgTAGk/lr6Aufx8elj6Em7K718vS1/CLGwA0gRAmgBI
+          EwBpAiBNAKQJgDQBkCYA0gRAWuZfISp/2uc8NgBpAiBNAKQJgDQBkCYA0gRAmgBIEwBpAiBte/d4
+          /770RcBSbADSBECaAEgTAGkCIE0ApAmANAGQJgDSBECaAEgTAGkCIE0ApAmANAGQJgDSBECaAEgT
+          AGkCIE0ApAmANAGQJgDSBECaAEgTAGm7t+fX7dIXAUuxAUgTAGkCIE0ApO02m83GgzBFb8+vWxuA
+          NAGQ9PfUs/v8AyixAUj7LwBbgIKPc24DkPYlAFuANfs8399uABGwRt/NtSMQaXsDsAVYk33zfHAD
+          iIA1ODTHjkCs2rGb+NEAbAFu1Smze9IGEAG35tSZPfkIJAJuxTmzetYzgAi4dufO6OCBvnu8fx/6
+          uzCFITfowZ8C2QZck6HzePEQ2wQs6dIb8Wh3cSEwtzFOIaMfY4TA1MY8fk92jhcCY5rqmXOWB1kx
+          MNTUH7b8AUe3rI5B6YCuAAAAAElFTkSuQmCC
+          SBP_EOF
+          echo "Kode aplikasi siap:"; find . -type f | sort
+
+      - name: Bangun APK
+        working-directory: sbprint-android
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Beri nama file
+        run: cp sbprint-android/app/build/outputs/apk/release/app-release.apk SBPrint.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SBPrint-apk
+          path: SBPrint.apk
+
+      - name: Terbitkan di Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: SB Print versi 1.0.${{ github.run_number }}
+          files: SBPrint.apk
+          make_latest: true
+          body: |
+            Unduh **SBPrint.apk** di bawah, buka di HP Android, lalu pasang.
+            Kalau HP meminta, izinkan "Instal dari sumber tidak dikenal" untuk browser/aplikasi file.
+            Versi baru bisa langsung dipasang menimpa versi lama (pengaturan printer tetap tersimpan).
