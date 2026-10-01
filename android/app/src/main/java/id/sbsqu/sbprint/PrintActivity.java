@@ -41,6 +41,8 @@ public class PrintActivity extends Activity {
             final boolean failed = err != null;
             runOnUiThread(() -> {
                 Toast.makeText(getApplicationContext(), msg, failed ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
+                // jaga sambungan tetap terbuka untuk struk berikutnya
+                PrinterService.connect(getApplicationContext());
                 finish();
             });
         }).start();

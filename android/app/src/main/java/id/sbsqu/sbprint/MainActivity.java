@@ -84,9 +84,15 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl(PAGE);
 
-        if (!Printer.hasPermission(this)) {
-            requestPermissions(new String[]{Printer.PERM_CONNECT}, REQ_PERM);
+        List<String> need = new ArrayList<>();
+        if (!Printer.hasPermission(this)) need.add(Printer.PERM_CONNECT);
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+            need.add("android.permission.POST_NOTIFICATIONS");
         }
+        if (!need.isEmpty()) requestPermissions(need.toArray(new String[0]), REQ_PERM);
+        // Sambung sekali ke printer default dan jaga tetap tersambung
+        PrinterService.connect(this);
         if (pending != null) toast("Pilih printer di daftar — struk dari SB Sejahtera langsung dicetak");
     }
 
@@ -95,6 +101,7 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         byte[] p = intent.getByteArrayExtra(EXTRA_PENDING);
         if (p != null) { pending = p; toast("Pilih printer di daftar — struk langsung dicetak"); }
+        if (PrinterService.ACTION_CONNECT.equals(intent.getAction())) PrinterService.connect(this);
     }
 
     @Override
@@ -111,7 +118,7 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode != REQ_PERM) return;
-        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) notifyPage();
+        if (Printer.hasPermission(this)) { PrinterService.connect(this); notifyPage(); }
         else toast("Izin Bluetooth diperlukan supaya SB Print bisa mencetak");
     }
 
@@ -179,8 +186,29 @@ public class MainActivity extends Activity {
         public void setDefaultPrinter(String address, String name) {
             if (address == null || address.isEmpty()) return;
             Printer.save(MainActivity.this, address, name);
-            runOnUiThread(MainActivity.this::printPendingInBackground);
+            runOnUiThread(() -> {
+                PrinterService.connect(MainActivity.this);
+                printPendingInBackground();
+            });
         }
+
+        /** Status sambungan untuk ditampilkan di layar: connected / connecting / disconnected / idle. */
+        @JavascriptInterface
+        public String getConnectionState() {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("state", Printer.stateName());
+                o.put("name", Printer.name(MainActivity.this) == null ? "" : Printer.name(MainActivity.this));
+                o.put("address", Printer.address(MainActivity.this) == null ? "" : Printer.address(MainActivity.this));
+                return o.toString();
+            } catch (Exception e) { return "{\"state\":\"idle\"}"; }
+        }
+
+        @JavascriptInterface
+        public void connect() { runOnUiThread(() -> PrinterService.connect(MainActivity.this)); }
+
+        @JavascriptInterface
+        public void disconnect() { runOnUiThread(() -> PrinterService.stop(MainActivity.this)); }
 
         @JavascriptInterface
         public String printBase64(String b64, String address) {
@@ -205,8 +233,10 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void exitApp() {
-            Printer.close();
-            runOnUiThread(MainActivity.this::finishAndRemoveTask);
+            runOnUiThread(() -> {
+                PrinterService.stop(MainActivity.this);
+                finishAndRemoveTask();
+            });
         }
     }
 }

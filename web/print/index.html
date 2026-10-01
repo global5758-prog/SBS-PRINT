@@ -295,10 +295,14 @@
       <label style="margin-top:0;">Pilih printer (aplikasi Android)</label>
       <select id="androidDeviceSelect"></select>
       <div class="row" style="margin-top:10px;">
+        <button id="btnAndroidConnect">🔌 Sambungkan</button>
+        <button id="btnAndroidDisconnect" class="secondary" style="display:none;">⏏️ Putuskan</button>
         <button id="btnAndroidRefresh" class="secondary">Muat Ulang Daftar</button>
       </div>
       <div class="note">
         Mode aplikasi Android aktif — mendukung semua printer Bluetooth (termasuk Bluetooth Classic/SPP).
+        Printer disambungkan <b>sekali</b> lalu dijaga tetap tersambung (ada pemberitahuan "SB Print — terhubung").
+        Hanya kalau sambungan terputus, aplikasi mencoba menyambung lagi lalu meminta Anda menyambungkan.
         Pastikan printer sudah di-pairing lewat Pengaturan Bluetooth HP.
       </div>
       <button id="btnBtSettings" class="secondary" style="margin-top:8px;">⚙️ Buka Pengaturan Bluetooth HP (pairing)</button>
@@ -520,8 +524,13 @@ function setStatus(kind, text){
   $('connText').textContent=text;
   renderConn();
 }
+// Status sambungan dari aplikasi Android (sambungan dijaga terus oleh aplikasi, seperti RawBT)
+function appConnState(){
+  try{ if(window.AndroidBridge && window.AndroidBridge.getConnectionState) return JSON.parse(window.AndroidBridge.getConnectionState()); }catch(e){}
+  return null;
+}
 function isConnected(){
-  if(isAndroidApp) return !!androidSelectedAddress;
+  if(isAndroidApp){ const st=appConnState(); return st ? st.state==='connected' : !!androidSelectedAddress; }
   if(btChar && btDevice && btDevice.gatt && btDevice.gatt.connected) return true;
   if(usbDevice && usbDevice.opened) return true;
   return false;
@@ -538,7 +547,11 @@ function renderConn(){
   const chip=$('connChip');
   if(!chip || !connReady) return;
   let kind, text;
-  if(isConnected()){ kind='ok'; text=(isAndroidApp?'Printer siap · ':'Printer terhubung · ')+connectedName(); }
+  const appSt = isAndroidApp ? appConnState() : null;
+  if(appSt && appSt.state==='connecting'){ kind='warn'; text='Menyambungkan ke '+(appSt.name||'printer')+'…'; }
+  else if(appSt && appSt.state==='disconnected'){ kind='err'; text='Printer TERPUTUS — ketuk untuk sambungkan'; }
+  else if(appSt && appSt.state==='idle'){ kind=''; text = appSt.address ? 'Printer diputus — ketuk untuk sambungkan' : 'Pilih printer dulu'; }
+  else if(isConnected()){ kind='ok'; text='Printer terhubung · '+connectedName(); }
   else if(bleReconnecting){ kind='warn'; text='Printer terputus — menyambung ulang…'; }
   else if(hasRememberedPrinter()){ kind='err'; text='Printer TERPUTUS — ketuk untuk sambungkan'; }
   else { kind=''; text='Printer belum terhubung'; }
@@ -546,6 +559,11 @@ function renderConn(){
   $('chipDot').className='dot '+kind;
   $('chipText').textContent=text;
   document.title=(kind==='ok'?'🟢 ':kind?'🔴 ':'')+'SB Print';
+  if(isAndroidApp && appSt){
+    const on = appSt.state==='connected' || appSt.state==='connecting';
+    $('btnAndroidConnect').style.display = on ? 'none' : '';
+    $('btnAndroidDisconnect').style.display = on ? '' : 'none';
+  }
   // tombol di kartu
   if(!isAndroidApp && $('rowConnected')){
     const conn=isConnected();
@@ -582,6 +600,11 @@ function initConnUi(){
     toast('Kartu printer ditutup. Status tetap terlihat di atas — ketuk untuk membuka lagi.');
   };
   $('connChip').onclick=()=>{
+    if(isAndroidApp && !isConnected()){
+      try{ window.AndroidBridge.connect(); toast('Menyambungkan ke printer…'); }catch(e){}
+      renderConn();
+      return;
+    }
     setCompact(false);
     connUi='open'; applyConnUi();
     $('connCard').scrollIntoView({behavior:'smooth', block:'start'});
@@ -600,6 +623,7 @@ function setCompact(on){
   try{ localStorage.setItem(LS_COMPACT, on?'1':'0'); }catch(e){}
 }
 async function disconnectPrinter(){
+  if(isAndroidApp){ try{ window.AndroidBridge.disconnect && window.AndroidBridge.disconnect(); }catch(e){} return; }
   if(btDevice && btDevice.gatt && btDevice.gatt.connected){
     manualDisconnect=true;
     try{ btDevice.gatt.disconnect(); }catch(e){}
@@ -1126,6 +1150,31 @@ function initAndroidBridge(){
     $('btnBtSettings').onclick=()=>{ try{ window.AndroidBridge.openBluetoothSettings(); }catch(e){} };
   }else{
     $('btnBtSettings').style.display='none';
+  }
+  $('btnAndroidConnect').onclick=()=>{
+    try{ window.AndroidBridge.connect(); }catch(e){}
+    toast('Menyambungkan ke printer…');
+    setTimeout(renderConn, 300);
+  };
+  $('btnAndroidDisconnect').onclick=()=>{
+    try{ window.AndroidBridge.disconnect(); }catch(e){}
+    toast('Sambungan printer diputus. Printer tetap diingat.');
+    setTimeout(renderConn, 300);
+  };
+  // Pantau sambungan terus — beri tahu begitu printer terputus atau tersambung lagi
+  if(window.AndroidBridge.getConnectionState){
+    let last=null;
+    setInterval(()=>{
+      const st=appConnState(); if(!st) return;
+      if(last && last!==st.state){
+        if(st.state==='connected'){ setStatus('ok','Terhubung: '+(st.name||'printer')); toast('✅ Printer tersambung'); }
+        else if(st.state==='disconnected'){ setStatus('err','Printer TERPUTUS — nyalakan printer, aplikasi mencoba menyambung lagi'); toast('⚠️ Printer terputus'); }
+        else if(st.state==='connecting'){ setStatus('warn','Menyambungkan ke '+(st.name||'printer')+'…'); }
+        else if(st.state==='idle'){ setStatus('','Sambungan diputus. Printer tetap diingat — tekan Sambungkan kapan saja.'); }
+      }
+      last=st.state;
+      renderConn();
+    }, 1500);
   }
   refreshAndroidDevices();
   syncLastJobFromApp();

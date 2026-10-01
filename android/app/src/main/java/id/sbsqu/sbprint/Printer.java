@@ -9,22 +9,30 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.UUID;
 
 /**
- * Pengiriman byte ESC/POS ke printer thermal lewat Bluetooth Classic (SPP) —
- * cara yang sama dengan RawBT. Sambungan disimpan selama aplikasi hidup supaya
- * cetakan berikutnya langsung jalan tanpa menyambung ulang.
+ * Sambungan Bluetooth Classic (SPP) ke printer thermal — cara yang sama dengan RawBT.
+ * Sambungan dibuka sekali lalu DIBIARKAN TERBUKA (dijaga oleh PrinterService), jadi
+ * cetakan berikutnya langsung jalan. Kalau sambungan putus, status berubah ke
+ * DISCONNECTED dan PrinterService mencoba menyambung ulang / memberi tahu pengguna.
  */
 public final class Printer {
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final String PREFS = "sbprint";
     public static final String PERM_CONNECT = "android.permission.BLUETOOTH_CONNECT";
 
+    public static final int IDLE = 0, CONNECTING = 1, CONNECTED = 2, DISCONNECTED = 3;
+
+    public interface Listener { void onState(int state); }
+
     private static BluetoothSocket socket;
     private static String socketAddress;
+    private static volatile int state = IDLE;
+    private static volatile Listener listener;
 
     private Printer() {}
 
@@ -35,8 +43,9 @@ public final class Printer {
     public static String name(Context c) { return prefs(c).getString("name", null); }
 
     public static void save(Context c, String address, String name) {
+        String old = address(c);
         prefs(c).edit().putString("address", address).putString("name", name).apply();
-        close();
+        if (old != null && !old.equals(address)) close(IDLE);
     }
 
     public static boolean hasPermission(Context c) {
@@ -48,6 +57,32 @@ public final class Printer {
         return hasPermission(c) && address(c) != null;
     }
 
+    // ---------- status sambungan ----------
+    public static int state() { return state; }
+    public static boolean isConnected() { return state == CONNECTED; }
+    public static void setListener(Listener l) { listener = l; }
+    private static void setState(int s) {
+        if (state == s) return;
+        state = s;
+        Listener l = listener;
+        if (l != null) { try { l.onState(s); } catch (Exception ignored) { } }
+    }
+    public static String stateName() {
+        switch (state) {
+            case CONNECTED: return "connected";
+            case CONNECTING: return "connecting";
+            case DISCONNECTED: return "disconnected";
+            default: return "idle";
+        }
+    }
+
+    /** Buka sambungan ke printer default (tanpa mencetak). Dipanggil dari thread latar belakang. */
+    public static synchronized void connect(Context c) throws IOException {
+        String addr = address(c);
+        if (addr == null || addr.isEmpty()) throw new IOException("Printer default belum dipilih");
+        ensureSocket(adapterOrThrow(), addr);
+    }
+
     /** Kirim byte ke printer default. Dipanggil dari thread latar belakang. */
     public static void send(Context c, byte[] data) throws IOException {
         sendTo(c, address(c), data);
@@ -56,18 +91,22 @@ public final class Printer {
     /** Kirim byte ke printer tertentu (alamat Bluetooth). Dipanggil dari thread latar belakang. */
     public static synchronized void sendTo(Context c, String addr, byte[] data) throws IOException {
         if (addr == null || addr.isEmpty()) throw new IOException("Printer default belum dipilih");
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (adapter == null) throw new IOException("HP ini tidak punya Bluetooth");
-        if (!adapter.isEnabled()) throw new IOException("Bluetooth HP masih mati — nyalakan dulu");
-
+        BluetoothAdapter adapter = adapterOrThrow();
         try {
             writeAll(ensureSocket(adapter, addr), data);
         } catch (IOException first) {
-            // Sambungan lama mungkin sudah putus (printer dimatikan) — sambung ulang sekali
-            close();
+            // Sambungan lama sudah putus (printer sempat mati) — sambung ulang sekali, tanpa bertanya
+            closeSocketOnly();
             writeAll(ensureSocket(adapter, addr), data);
         }
         saveLastJob(c, data);
+    }
+
+    private static BluetoothAdapter adapterOrThrow() throws IOException {
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null) throw new IOException("HP ini tidak punya Bluetooth");
+        if (!adapter.isEnabled()) throw new IOException("Bluetooth HP masih mati — nyalakan dulu");
+        return adapter;
     }
 
     /** Struk terakhir disimpan supaya bisa "Cetak Ulang Terakhir" dari layar aplikasi. */
@@ -78,8 +117,9 @@ public final class Printer {
     public static String lastJob(Context c) { return prefs(c).getString("lastJob", ""); }
 
     private static BluetoothSocket ensureSocket(BluetoothAdapter adapter, String addr) throws IOException {
-        if (socket != null && socket.isConnected() && addr.equals(socketAddress)) return socket;
-        close();
+        if (socket != null && socket.isConnected() && addr.equals(socketAddress) && state == CONNECTED) return socket;
+        closeSocketOnly();
+        setState(CONNECTING);
         BluetoothDevice device = adapter.getRemoteDevice(addr);
         try { adapter.cancelDiscovery(); } catch (SecurityException ignored) { }
 
@@ -97,6 +137,8 @@ public final class Printer {
                 s.connect();
                 socket = s;
                 socketAddress = addr;
+                watch(s);
+                setState(CONNECTED);
                 return s;
             } catch (IOException e) {
                 last = e;
@@ -106,8 +148,32 @@ public final class Printer {
                 try { if (s != null) s.close(); } catch (IOException ignored) { }
             }
         }
+        setState(DISCONNECTED);
         throw new IOException("Printer tidak tersambung. Pastikan printer menyala dan dekat HP. ("
                 + (last == null ? "-" : last.getMessage()) + ")");
+    }
+
+    /**
+     * Pengawas sambungan: membaca terus dari printer. Begitu printer dimatikan / menjauh,
+     * pembacaan gagal → status DISCONNECTED (dipakai untuk memberi tahu pengguna).
+     */
+    private static void watch(final BluetoothSocket s) {
+        Thread t = new Thread(() -> {
+            try {
+                InputStream in = s.getInputStream();
+                byte[] buf = new byte[64];
+                while (in.read(buf) >= 0) { /* abaikan data status dari printer */ }
+            } catch (IOException ignored) { }
+            onLost(s);
+        }, "sbprint-watch");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private static synchronized void onLost(BluetoothSocket s) {
+        if (socket != s) return;   // sudah ditutup sengaja / diganti sambungan baru
+        closeSocketOnly();
+        setState(DISCONNECTED);
     }
 
     private static void writeAll(BluetoothSocket s, byte[] data) throws IOException {
@@ -122,9 +188,17 @@ public final class Printer {
         try { Thread.sleep(Math.min(1500, 200 + data.length / 20)); } catch (InterruptedException ignored) { }
     }
 
-    public static synchronized void close() {
-        try { if (socket != null) socket.close(); } catch (IOException ignored) { }
+    private static synchronized void closeSocketOnly() {
+        BluetoothSocket s = socket;
         socket = null;
         socketAddress = null;
+        try { if (s != null) s.close(); } catch (IOException ignored) { }
     }
+
+    /** Tutup sambungan dengan sengaja (tombol Putuskan / keluar). */
+    public static void close(int newState) {
+        closeSocketOnly();
+        setState(newState);
+    }
+    public static void close() { close(DISCONNECTED); }
 }
